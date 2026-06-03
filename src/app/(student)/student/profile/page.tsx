@@ -1,0 +1,6 @@
+// app/(student)/profile/page.tsx
+import { redirect } from "next/navigation";
+
+export default function ProfilePage() {
+  redirect("/student/profile/account");
+}
