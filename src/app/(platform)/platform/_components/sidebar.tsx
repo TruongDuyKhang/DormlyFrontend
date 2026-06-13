@@ -68,7 +68,7 @@ const menuItems: MenuItem[] = [
       { label: "Rooms", href: "/platform/operations/rooms" },
       { label: "Complaints", href: "/platform/operations/complaints" },
       { label: "Tickets", href: "/platform/operations/tickets" },
-      { label: "Chat", href: "/platform/operations/chat" },
+      // { label: "Chat", href: "/platform/operations/chat" },
     ]
   },
   { 
@@ -76,22 +76,22 @@ const menuItems: MenuItem[] = [
     label: "Analytics", 
     submenu: [
       { label: "Insights", href: "/platform/analytics/insights" },
-      { label: "Reports", href: "/platform/analytics/reports" },
+      // { label: "Reports", href: "/platform/analytics/reports" },
     ]
   },
-  { 
-    icon: MessageSquare, 
-    label: "Communication", 
-    submenu: [
-      { label: "Notifications", href: "/platform/communication/notifications" },
-    ]
-  },
+  // { 
+  //   icon: MessageSquare, 
+  //   label: "Communication", 
+  //   submenu: [
+  //     { label: "Notifications", href: "/platform/communication/notifications" },
+  //   ]
+  // },
   { 
     icon: Settings, 
     label: "Settings", 
     submenu: [
       { label: "Residence Structure", href: "/platform/settings/structure" },
-      { label: "AI Assistant", href: "/platform/settings/ai-assistant" },
+      // { label: "AI Assistant", href: "/platform/settings/ai-assistant" },
       { label: "Activity Logs", href: "/platform/settings/activity-logs" },
     ]
   },

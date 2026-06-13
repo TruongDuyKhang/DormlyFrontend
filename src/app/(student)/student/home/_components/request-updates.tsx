@@ -1,7 +1,7 @@
 // app/(student)/home/_components/request-updates.tsx
 "use client";
 
-import { ArrowRight, Wrench, MessageSquare, Home, Clock } from "lucide-react";
+import { ArrowRight, Wrench, MessageSquare, Home, Clock, CheckCircle, Circle, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -11,12 +11,14 @@ interface RequestUpdate {
   status: "pending" | "in_progress" | "completed" | "approved" | "rejected";
   type: "maintenance" | "complaint" | "transfer";
   updatedAt: string;
+  description?: string;
 }
 
 const requestUpdates: RequestUpdate[] = [
   {
     id: "1",
     title: "Air conditioner inspection",
+    description: "The AC unit is not cooling properly. Technician has been assigned.",
     status: "in_progress",
     type: "maintenance",
     updatedAt: "2 hours ago",
@@ -24,6 +26,7 @@ const requestUpdates: RequestUpdate[] = [
   {
     id: "2",
     title: "Room transfer request",
+    description: "Request to move to a quieter floor due to noise issues.",
     status: "approved",
     type: "transfer",
     updatedAt: "Yesterday",
@@ -31,6 +34,7 @@ const requestUpdates: RequestUpdate[] = [
   {
     id: "3",
     title: "Noise complaint - Room A305",
+    description: "Loud music after 11 PM from neighboring room.",
     status: "pending",
     type: "complaint",
     updatedAt: "Yesterday",
@@ -38,17 +42,17 @@ const requestUpdates: RequestUpdate[] = [
 ];
 
 const statusConfig = {
-  pending: { label: "Pending", color: "bg-amber-500 text-white" },
-  in_progress: { label: "In Progress", color: "bg-sky-500 text-white" },
-  completed: { label: "Completed", color: "bg-emerald-500 text-white" },
-  approved: { label: "Approved", color: "bg-emerald-500 text-white" },
-  rejected: { label: "Rejected", color: "bg-red-500 text-white" },
+  pending: { label: "Pending Review", color: "bg-amber-500 text-white", icon: Clock },
+  in_progress: { label: "In Progress", color: "bg-sky-500 text-white", icon: AlertCircle },
+  completed: { label: "Completed", color: "bg-emerald-500 text-white", icon: CheckCircle },
+  approved: { label: "Approved", color: "bg-emerald-500 text-white", icon: CheckCircle },
+  rejected: { label: "Rejected", color: "bg-red-500 text-white", icon: AlertCircle },
 };
 
 const typeConfig = {
-  maintenance: { icon: Wrench, label: "Maintenance" },
-  complaint: { icon: MessageSquare, label: "Complaint" },
-  transfer: { icon: Home, label: "Transfer" },
+  maintenance: { icon: Wrench, label: "Maintenance", bg: "bg-sky-100 text-sky-700" },
+  complaint: { icon: MessageSquare, label: "Complaint", bg: "bg-amber-100 text-amber-700" },
+  transfer: { icon: Home, label: "Transfer", bg: "bg-emerald-100 text-emerald-700" },
 };
 
 export function RequestUpdates() {
@@ -56,7 +60,8 @@ export function RequestUpdates() {
 
   return (
     <div className="rounded-[1.75rem] border border-white/50 bg-white/70 p-5 shadow-lg backdrop-blur-md sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-800">
             My Requests
@@ -71,8 +76,10 @@ export function RequestUpdates() {
               </span>
             )}
           </div>
+          <p className="text-sm text-stone-500 mt-1">
+            Track your maintenance tickets, complaints, and transfer requests
+          </p>
         </div>
-        {/* View all - chuyển đến trang /student/requests */}
         <Link
           href="/student/requests"
           className="inline-flex items-center gap-2 rounded-full border border-stone-400 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm transition hover:bg-stone-100 active:scale-[0.98]"
@@ -82,11 +89,13 @@ export function RequestUpdates() {
         </Link>
       </div>
 
-      <div className="mt-6 space-y-3">
+      {/* Request List - Full chiều dài */}
+      <div className="space-y-4">
         {requestUpdates.map((request, idx) => {
           const status = statusConfig[request.status];
           const type = typeConfig[request.type];
           const TypeIcon = type.icon;
+          const StatusIcon = status.icon;
 
           return (
             <motion.div
@@ -94,43 +103,75 @@ export function RequestUpdates() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.08 }}
-              className="group rounded-xl border border-stone-200 bg-white p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+              className="group rounded-xl border border-stone-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3 flex-1">
-                  {/* Icon */}
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-stone-100">
-                    <TypeIcon className="h-4 w-4 text-stone-600" />
+              <div className="flex flex-col gap-4">
+                {/* Header row with type and status */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${type.bg}`}>
+                      <TypeIcon className="h-3 w-3" />
+                      {type.label}
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${status.color}`}>
+                      <StatusIcon className="h-3 w-3" />
+                      {status.label}
+                    </span>
                   </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-bold text-stone-900">
-                        {request.title}
-                      </h3>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.color}`}>
-                        {status.label}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-stone-500">
-                      <Clock className="h-3 w-3" />
-                      Updated {request.updatedAt}
-                    </div>
+                  <div className="flex items-center gap-1 text-xs text-stone-500">
+                    <Clock className="h-3 w-3" />
+                    Updated {request.updatedAt}
                   </div>
                 </div>
-                
-                {/* Status indicator */}
-                {request.status === "pending" && (
-                  <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+
+                {/* Title */}
+                <h3 className="text-lg font-bold text-stone-900">
+                  {request.title}
+                </h3>
+
+                {/* Description */}
+                {request.description && (
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    {request.description}
+                  </p>
                 )}
+
+                {/* Progress indicator for in_progress status */}
                 {request.status === "in_progress" && (
-                  <div className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-xs text-stone-500 mb-1">
+                      <span>Progress</span>
+                      <span>68%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+                      <div className="h-full w-[68%] rounded-full bg-sky-500" />
+                    </div>
+                  </div>
                 )}
+
+                {/* Action button */}
+                <Link
+                  href={`/student/requests/${request.id}`}
+                  className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-200 active:scale-[0.98]"
+                >
+                  View details
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </motion.div>
           );
         })}
+      </div>
+
+      {/* Create new request button */}
+      <div className="mt-6 pt-4 border-t border-stone-200">
+        <Link
+          href="/student/requests"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-[#2f2a24] py-3 text-sm font-semibold text-white transition hover:bg-[#40382f] active:scale-[0.98]"
+        >
+          <span>➕</span>
+          Create new request
+        </Link>
       </div>
     </div>
   );
