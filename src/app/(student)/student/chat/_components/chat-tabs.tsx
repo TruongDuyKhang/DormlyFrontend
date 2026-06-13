@@ -7,7 +7,7 @@ import { MessageCircle, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { label: "Messages", href: "/student/chat/messages", icon: MessageCircle },
+  // { label: "Messages", href: "/student/chat/messages", icon: MessageCircle },
   { label: "Dormly AI", href: "/student/chat/ai", icon: Bot },
 ];
 

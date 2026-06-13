@@ -37,8 +37,8 @@ const items = [
   { label: "Home", href: "/student/home", icon: Home },
   { label: "Residence", href: "/student/residence/room", icon: Sparkles },
   { label: "Requests", href: "/student/requests", icon: Bell },
-  { label: "Community", href: "/student/community/feed", icon: MessageCircle },
-  { label: "Chat", href: "/student/chat", icon: Bot },
+  // { label: "Community", href: "/student/community/feed", icon: MessageCircle },
+   { label: "Chat", href: "/student/chat", icon: Bot },
   { label: "Profile", href: "/student/profile/account", icon: User },
 ];
 
@@ -281,7 +281,7 @@ export function StudentShellNav() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-6 rounded-[1.5rem] border border-white/60 bg-[#f7f2ea]/86 p-1.5 shadow-[0_24px_60px_-38px_rgba(38,35,31,0.75),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl lg:hidden">
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 rounded-[1.5rem] border border-white/60 bg-[#f7f2ea]/86 p-1.5 shadow-[0_24px_60px_-38px_rgba(38,35,31,0.75),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl lg:hidden">
         {items.map((item) => {
           const active = isActive(item.label, item.href);
           const Icon = item.icon;

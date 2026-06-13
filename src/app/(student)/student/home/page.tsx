@@ -7,7 +7,6 @@ import { ResidenceCompanion } from "./_components/residence-companion";
 import { QuickActions } from "./_components/quick-actions";
 import { CommunityHighlights } from "./_components/community-highlights";
 import { RequestUpdates } from "./_components/request-updates";
-import { UpcomingEvents } from "./_components/upcoming-events";
 import { MyResidence } from "./_components/my-residence";
 import type { WeatherData } from "./_components/types";
 
@@ -86,7 +85,7 @@ export default function StudentHomePage() {
 
   return (
     <>
-      {/* Weather Background - Phiên bản mới không cần condition/isDay */}
+      {/* Weather Background */}
       <WeatherBackground />
 
       {/* Content */}
@@ -105,18 +104,11 @@ export default function StudentHomePage() {
           </div>
         </section>
 
-        {/* Grid 2 cột - Tỉ lệ 6:4 (lg:grid-cols-3) */}
-        <section className="mt-6 grid gap-6 lg:grid-cols-3">
-          {/* Cột trái - Community Highlights (chiếm 2/3 ≈ 6 phần) */}
-          <div className="lg:col-span-2">
-            <CommunityHighlights />
-          </div>
-
-          {/* Cột phải - Request Updates + Upcoming Events (chiếm 1/3 ≈ 4 phần) */}
-          <aside className="space-y-6">
+        {/* Grid 2 cột - Tỉ lệ 6:4 */}
+        <section className="mt-6">
+      
             <RequestUpdates />
-            <UpcomingEvents />
-          </aside>
+
         </section>
       </div>
     </>
