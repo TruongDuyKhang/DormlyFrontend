@@ -39,3 +39,21 @@ export interface RoomType {
   createdAt: string;
   updatedAt: string;
 }
+
+// NEW: Room interface
+export interface Room {
+  id: string;
+  roomNumber: string;
+  blockId: string;
+  blockName: string;
+  floorId: string;
+  floorLevel: number;
+  roomTypeId: string;
+  roomTypeName: string;
+  capacity: number;
+  currentOccupants: number;
+  status: 'available' | 'occupied' | 'maintenance' | 'reserved';
+  genderRestriction: 'all' | 'male' | 'female';
+  createdAt: string;
+  updatedAt: string;
+}

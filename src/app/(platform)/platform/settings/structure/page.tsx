@@ -1,15 +1,16 @@
-// app/(platform)/platform/settings/structure/page.tsx
+// app/(platform)/settings/structure/page.tsx
 'use client';
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Layers, Tag, Home } from 'lucide-react';
+import { Building2, Layers, DoorClosed, Tag } from 'lucide-react';
 import { BlocksTab } from './_components/BlocksTab';
 import { FloorsTab } from './_components/FloorsTab';
+import { RoomsTab } from './_components/RoomsTab';
 import { RoomTypesTab } from './_components/RoomTypesTab';
 import { cn } from '@/lib/utils';
 
-type TabType = 'blocks' | 'floors' | 'room-types';
+type TabType = 'blocks' | 'floors' | 'rooms' | 'room-types';
 
 export default function StructurePage() {
   const [activeTab, setActiveTab] = useState<TabType>('blocks');
@@ -17,6 +18,7 @@ export default function StructurePage() {
   const tabs = [
     { id: 'blocks' as const, label: 'Blocks', description: 'Residence wings and buildings', icon: Building2 },
     { id: 'floors' as const, label: 'Floors', description: 'Floor levels within blocks', icon: Layers },
+    { id: 'rooms' as const, label: 'Rooms', description: 'Individual rooms in each floor', icon: DoorClosed },
     { id: 'room-types' as const, label: 'Room Types', description: 'Categories and pricing', icon: Tag },
   ];
 
@@ -36,7 +38,7 @@ export default function StructurePage() {
           {/* Header */}
           <div className="mb-6">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/34 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.22em] text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-xl">
-              <Home className="h-3.5 w-3.5" />
+              <Building2 className="h-3.5 w-3.5" />
               Residence Infrastructure
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -45,14 +47,14 @@ export default function StructurePage() {
                   Residence Structure
                 </h1>
                 <p className="mt-2 text-sm text-stone-600">
-                  Configure blocks, floors, and room types for your dormitory
+                  Configure blocks, floors, rooms, and room types
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex gap-1 border-b border-white/40 mb-6">
+          {/* Tab Navigation - Rooms kế bên Floors */}
+          <div className="flex flex-wrap gap-1 border-b border-white/40 mb-6">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -86,6 +88,7 @@ export default function StructurePage() {
           >
             {activeTab === 'blocks' && <BlocksTab />}
             {activeTab === 'floors' && <FloorsTab />}
+            {activeTab === 'rooms' && <RoomsTab />}
             {activeTab === 'room-types' && <RoomTypesTab />}
           </motion.div>
         </div>

@@ -1,9 +1,8 @@
 // app/(auth)/register/_components/register-form.tsx
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlertCircle,
@@ -24,473 +23,25 @@ import {
   BookOpen,
   Clock,
   RefreshCw,
-  ChevronDown,
-  Upload,
-  FileText,
-  CheckCircle,
-  XCircle,
+  UserPlus,
 } from "lucide-react";
 
-// File validation
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
-
-// Zod schema với lifestyle preferences và file upload
-const registerSchema = z
-  .object({
-    // Basic info
-    email: z.string().email("Please enter a valid email address."),
-    fullName: z.string().min(2, "Full name must be at least 2 characters."),
-    studentId: z.string().min(5, "Student ID must be at least 5 characters."),
-    dateOfBirth: z.string().min(1, "Please select your date of birth."),
-    startYear: z.string().min(4, "Please select start year."),
-    endYear: z.string().min(4, "Please select end year."),
-    phone: z.string().min(10, "Phone number must be at least 10 digits."),
-    password: z.string().min(6, "Password must be at least 6 characters."),
-    confirmPassword: z.string().min(6, "Please confirm your password."),
-    
-    // Lifestyle preferences
-    sleepTime: z.string().min(1, "Please select your preferred sleep time."),
-    wakeUpTime: z.string().min(1, "Please select your preferred wake-up time."),
-    quietPreference: z.string().min(1, "Please select your quiet environment preference."),
-    socialPreference: z.string().min(1, "Please select your social interaction preference."),
-    studyHabit: z.string().min(1, "Please select your study habit preference."),
-    routineStrictness: z.string().min(1, "Please select your routine strictness."),
-    adaptability: z.string().min(1, "Please select your adaptability level."),
-    
-    // Files (will be validated separately)
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match.",
-    path: ["confirmPassword"],
-  });
-
-type RegisterFormValues = z.infer<typeof registerSchema>;
-
-// Sleep time options
-const sleepTimeOptions = [
-  { value: "21:00", label: "Before 10:00 PM", band: "before_22", score: 10, description: "Very early sleeper" },
-  { value: "22:00", label: "10:00 PM - 11:00 PM", band: "22_23", score: 25, description: "Early sleeper" },
-  { value: "23:00", label: "11:00 PM - 12:00 AM", band: "23_00", score: 50, description: "Normal sleeper" },
-  { value: "00:00", label: "12:00 AM - 1:00 AM", band: "00_01", score: 75, description: "Late sleeper" },
-  { value: "01:00", label: "After 1:00 AM", band: "after_01", score: 90, description: "Very late sleeper" },
-];
-
-// Wake time options
-const wakeTimeOptions = [
-  { value: "05:00", label: "Before 6:00 AM", band: "before_06", score: 10, description: "Very early riser" },
-  { value: "06:00", label: "6:00 AM - 7:00 AM", band: "06_07", score: 25, description: "Early riser" },
-  { value: "07:00", label: "7:00 AM - 8:00 AM", band: "07_08", score: 50, description: "Normal riser" },
-  { value: "08:00", label: "8:00 AM - 9:00 AM", band: "08_09", score: 75, description: "Late riser" },
-  { value: "09:00", label: "After 9:00 AM", band: "after_09", score: 90, description: "Very late riser" },
-];
-
-// Level options
-const levelOptions = [
-  { value: "1", label: "Level 1" },
-  { value: "2", label: "Level 2" },
-  { value: "3", label: "Level 3" },
-  { value: "4", label: "Level 4" },
-  { value: "5", label: "Level 5" },
-];
-
-// Labels for each preference
-const quietPreferenceLabels = {
-  "1": "I need a very quiet room",
-  "2": "I prefer a quiet room",
-  "3": "Neutral",
-  "4": "I can tolerate normal room noise",
-  "5": "I am comfortable with an active/noisy room",
-};
-
-const socialPreferenceLabels = {
-  "1": "I prefer privacy most of the time",
-  "2": "I prefer limited interaction",
-  "3": "Neutral",
-  "4": "I like talking with roommates",
-  "5": "I enjoy a highly social room",
-};
-
-const studyHabitLabels = {
-  "1": "I mostly study alone in silence",
-  "2": "I prefer quiet individual study",
-  "3": "Flexible / neutral",
-  "4": "I sometimes study with others",
-  "5": "I often study in groups / active settings",
-};
-
-const routineStrictnessLabels = {
-  "1": "My routine changes often",
-  "2": "My routine is somewhat flexible",
-  "3": "Neutral",
-  "4": "I usually follow a fixed routine",
-  "5": "I strongly follow the same routine every day",
-};
-
-const adaptabilityLabels = {
-  "1": "I find it difficult to adapt to new living habits",
-  "2": "I need time to adapt",
-  "3": "Neutral",
-  "4": "I can adapt to most roommates",
-  "5": "I adapt very easily",
-};
-
-interface FileWithPreview {
-  file: File;
-  preview: string;
-  name: string;
-  size: string;
-  status: "pending" | "uploading" | "success" | "error";
-  error?: string;
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return "Registration failed. Please try again.";
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-// Custom Time Select Component
-function TimeSelect({ value, onChange, options, placeholder, error, icon }: {
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string; description: string }[];
-  placeholder: string;
-  error?: boolean;
-  icon?: React.ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find(opt => opt.value === value);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition-all flex items-center justify-between ${
-          error
-            ? "border-red-400 focus:border-red-500"
-            : "border-stone-950/15 focus:border-stone-950/45"
-        } ${!selectedOption ? "text-stone-400" : "text-stone-950"}`}
-      >
-        <span className="flex items-center gap-2">
-          {icon && <span className="text-stone-400">{icon}</span>}
-          {selectedOption ? `${selectedOption.label} (${selectedOption.description})` : placeholder}
-        </span>
-        <ChevronDown className={`size-4 text-stone-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-64 overflow-auto rounded-2xl border border-stone-200 bg-white shadow-lg">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-4 py-3 text-left transition hover:bg-stone-50 ${
-                  value === option.value ? "bg-amber-50 text-[#9d7443]" : "text-stone-700"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{option.label}</span>
-                  <span className="text-xs text-stone-400">{option.description}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Custom Select Component
-function CustomSelect({ value, onChange, options, placeholder, error, icon }: {
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  placeholder: string;
-  error?: boolean;
-  icon?: React.ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find(opt => opt.value === value);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition-all flex items-center justify-between ${
-          error
-            ? "border-red-400 focus:border-red-500"
-            : "border-stone-950/15 focus:border-stone-950/45"
-        } ${!selectedOption ? "text-stone-400" : "text-stone-950"}`}
-      >
-        <span className="flex items-center gap-2">
-          {icon && <span className="text-stone-400">{icon}</span>}
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <ChevronDown className={`size-4 text-stone-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-64 overflow-auto rounded-2xl border border-stone-200 bg-white shadow-lg">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-4 py-3 text-left text-sm transition hover:bg-stone-50 ${
-                  value === option.value ? "bg-amber-50 text-[#9d7443] font-medium" : "text-stone-700"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Year Select Component
-function YearSelect({ value, onChange, years, error, placeholder }: {
-  value: string;
-  onChange: (value: string) => void;
-  years: number[];
-  error?: boolean;
-  placeholder: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const options = [{ value: "", label: placeholder }, ...years.map(year => ({ value: year.toString(), label: year.toString() }))];
-  const selectedOption = options.find(opt => opt.value === value);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition-all flex items-center justify-between ${
-          error
-            ? "border-red-400 focus:border-red-500"
-            : "border-stone-950/15 focus:border-stone-950/45"
-        } ${!selectedOption || selectedOption.value === "" ? "text-stone-400" : "text-stone-950"}`}
-      >
-        {selectedOption && selectedOption.value !== "" ? selectedOption.label : placeholder}
-        <ChevronDown className={`size-4 text-stone-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-64 overflow-auto rounded-2xl border border-stone-200 bg-white shadow-lg">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-4 py-3 text-left text-sm transition hover:bg-stone-50 ${
-                  value === option.value ? "bg-amber-50 text-[#9d7443] font-medium" : "text-stone-700"
-                } ${option.value === "" ? "text-stone-400" : ""}`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// File Upload Component
-function FileUploadField({ label, required, accept, onFileSelect, error }: {
-  label: string;
-  required?: boolean;
-  accept?: string;
-  onFileSelect: (file: File | null) => void;
-  error?: string;
-}) {
-  const [file, setFile] = useState<FileWithPreview | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (selectedFile: File | null) => {
-    if (!selectedFile) {
-      setFile(null);
-      onFileSelect(null);
-      return;
-    }
-
-    // Validate file type
-    if (!ACCEPTED_FILE_TYPES.includes(selectedFile.type)) {
-      setFile({
-        file: selectedFile,
-        preview: "",
-        name: selectedFile.name,
-        size: formatFileSize(selectedFile.size),
-        status: "error",
-        error: "Only JPG, PNG, or PDF files are allowed",
-      });
-      onFileSelect(null);
-      return;
-    }
-
-    // Validate file size
-    if (selectedFile.size > MAX_FILE_SIZE) {
-      setFile({
-        file: selectedFile,
-        preview: "",
-        name: selectedFile.name,
-        size: formatFileSize(selectedFile.size),
-        status: "error",
-        error: "File size must be less than 5MB",
-      });
-      onFileSelect(null);
-      return;
-    }
-
-    // Create preview for images
-    const preview = selectedFile.type.startsWith("image/") ? URL.createObjectURL(selectedFile) : "";
-
-    setFile({
-      file: selectedFile,
-      preview,
-      name: selectedFile.name,
-      size: formatFileSize(selectedFile.size),
-      status: "success",
-    });
-    onFileSelect(selectedFile);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      handleFileChange(droppedFile);
-    }
-  };
-
-  const removeFile = () => {
-    if (file?.preview) {
-      URL.revokeObjectURL(file.preview);
-    }
-    setFile(null);
-    onFileSelect(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  return (
-    <div className="space-y-1">
-      <label className="text-sm font-semibold text-stone-900">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      
-      {!file ? (
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition ${
-            isDragging
-              ? "border-[#9d7443] bg-amber-50"
-              : error
-              ? "border-red-400 bg-red-50/30"
-              : "border-stone-300 hover:border-[#9d7443] hover:bg-amber-50/30"
-          }`}
-        >
-          <Upload className="mx-auto h-8 w-8 text-stone-400" />
-          <p className="mt-2 text-sm text-stone-600">
-            Click or drag & drop to upload
-          </p>
-          <p className="mt-1 text-xs text-stone-400">
-            JPG, PNG, or PDF (max 5MB)
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={accept || "image/jpeg,image/png,image/jpg,application/pdf"}
-            onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-            className="hidden"
-          />
-        </div>
-      ) : (
-        <div className={`rounded-2xl border p-4 ${
-          file.status === "error" ? "border-red-400 bg-red-50/30" : "border-emerald-200 bg-emerald-50/30"
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {file.preview ? (
-                <img src={file.preview} alt="Preview" className="h-12 w-12 rounded-lg object-cover" />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-stone-100">
-                  <FileText className="h-6 w-6 text-stone-500" />
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-stone-900">{file.name}</p>
-                <p className="text-xs text-stone-500">{file.size}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {file.status === "success" && (
-                <CheckCircle className="h-5 w-5 text-emerald-500" />
-              )}
-              {file.status === "error" && (
-                <XCircle className="h-5 w-5 text-red-500" />
-              )}
-              <button
-                type="button"
-                onClick={removeFile}
-                className="rounded-full p-1 text-stone-400 transition hover:bg-stone-100 hover:text-red-500"
-              >
-                <XCircle className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          {file.error && (
-            <p className="mt-2 text-xs text-red-500">{file.error}</p>
-          )}
-        </div>
-      )}
-      {error && !file && <p className="text-xs text-red-700">{error}</p>}
-    </div>
-  );
-}
+// Import từ các file tách
+import { registerSchema, type RegisterFormValues } from "./register-schema";
+import { sleepTimeOptions, wakeTimeOptions, levelOptions } from "./constants";
+import {
+  quietPreferenceLabels,
+  socialPreferenceLabels,
+  studyHabitLabels,
+  routineStrictnessLabels,
+  adaptabilityLabels,
+} from "./constants";
+import { getErrorMessage } from "./utils";
+import { CustomSelect } from "./custom-select";
+import { TimeSelect } from "./time-select";
+import { YearSelect } from "./year-select";
+import { FileUploadField } from "./file-upload-field";
+import { RoommatePreference } from "./roommate-preference";
 
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -526,6 +77,12 @@ export function RegisterForm() {
       endYear: "",
       sleepTime: "",
       wakeUpTime: "",
+      roommatePreference: "",
+      friendName: "",
+      friendStudentId: "", // NEW
+      friendBlock: "",
+      friendFloor: "",
+      friendRoom: "",
     },
   });
 
@@ -538,6 +95,7 @@ export function RegisterForm() {
   const watchEndYear = watch("endYear");
   const watchSleepTime = watch("sleepTime");
   const watchWakeUpTime = watch("wakeUpTime");
+  const watchRoommatePreference = watch("roommatePreference");
 
   const validateFiles = (): boolean => {
     let isValid = true;
@@ -566,8 +124,17 @@ export function RegisterForm() {
       throw new Error("Use an approved campus email to continue.");
     }
     
-    // Simulate file upload
     console.log("Uploading files:", citizenId.name, studentCard.name);
+    console.log("Roommate preference:", values.roommatePreference);
+    if (values.roommatePreference === "friend") {
+      console.log("Friend info:", {
+        name: values.friendName,
+        studentId: values.friendStudentId,
+        block: values.friendBlock,
+        floor: values.friendFloor,
+        room: values.friendRoom,
+      });
+    }
   };
 
   const onSubmit = async (values: RegisterFormValues) => {
@@ -628,6 +195,8 @@ export function RegisterForm() {
         : "border-stone-950/15 focus:border-stone-950/45"
     }`;
 
+  const isFriendSelected = watchRoommatePreference === "friend";
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {bannerError && (
@@ -642,7 +211,6 @@ export function RegisterForm() {
         <h3 className="text-sm font-bold text-stone-800">Basic Information</h3>
       </div>
 
-      {/* Email + Fullname */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-semibold text-stone-900">Email</label>
@@ -663,7 +231,6 @@ export function RegisterForm() {
         </div>
       </div>
 
-      {/* Student ID + DOB */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-semibold text-stone-900">Student ID</label>
@@ -684,7 +251,6 @@ export function RegisterForm() {
         </div>
       </div>
 
-      {/* Start Year + End Year */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-semibold text-stone-900">Start year</label>
@@ -711,7 +277,6 @@ export function RegisterForm() {
         </div>
       </div>
 
-      {/* Phone */}
       <div className="space-y-1">
         <label className="text-sm font-semibold text-stone-900">Phone number</label>
         <div className="relative">
@@ -727,7 +292,6 @@ export function RegisterForm() {
         <p className="text-xs text-stone-500 mt-0.5">Please upload clear images of your documents</p>
       </div>
 
-      {/* Citizen ID Upload */}
       <FileUploadField
         label="Citizen ID"
         required
@@ -736,7 +300,6 @@ export function RegisterForm() {
         error={citizenIdError}
       />
 
-      {/* Student Card Upload */}
       <FileUploadField
         label="Student Card"
         required
@@ -751,7 +314,6 @@ export function RegisterForm() {
         <p className="text-xs text-stone-500 mt-0.5">This helps us find compatible roommates for you</p>
       </div>
 
-      {/* Sleep Time + Wake Up Time */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-semibold text-stone-900 flex items-center gap-1">
@@ -784,7 +346,6 @@ export function RegisterForm() {
         </div>
       </div>
 
-      {/* Quiet Preference */}
       <div className="space-y-1">
         <label className="text-sm font-semibold text-stone-900 flex items-center gap-1">
           <Volume2 className="size-3.5" /> Quiet environment preference
@@ -794,7 +355,7 @@ export function RegisterForm() {
           onChange={(val) => setValue("quietPreference", val)}
           options={levelOptions.map(opt => ({
             value: opt.value,
-            label: `${opt.label} - ${quietPreferenceLabels[opt.value as keyof typeof quietPreferenceLabels]}`
+            label: `${opt.label} - ${quietPreferenceLabels[opt.value]}`
           }))}
           placeholder="Select your preference"
           error={Boolean(errors.quietPreference)}
@@ -803,7 +364,6 @@ export function RegisterForm() {
         {errors.quietPreference && <p className="text-xs text-red-700">{errors.quietPreference.message}</p>}
       </div>
 
-      {/* Social Preference */}
       <div className="space-y-1">
         <label className="text-sm font-semibold text-stone-900 flex items-center gap-1">
           <Users className="size-3.5" /> Social interaction preference
@@ -813,7 +373,7 @@ export function RegisterForm() {
           onChange={(val) => setValue("socialPreference", val)}
           options={levelOptions.map(opt => ({
             value: opt.value,
-            label: `${opt.label} - ${socialPreferenceLabels[opt.value as keyof typeof socialPreferenceLabels]}`
+            label: `${opt.label} - ${socialPreferenceLabels[opt.value]}`
           }))}
           placeholder="Select your preference"
           error={Boolean(errors.socialPreference)}
@@ -822,7 +382,6 @@ export function RegisterForm() {
         {errors.socialPreference && <p className="text-xs text-red-700">{errors.socialPreference.message}</p>}
       </div>
 
-      {/* Study Habit */}
       <div className="space-y-1">
         <label className="text-sm font-semibold text-stone-900 flex items-center gap-1">
           <BookOpen className="size-3.5" /> Study habit
@@ -832,7 +391,7 @@ export function RegisterForm() {
           onChange={(val) => setValue("studyHabit", val)}
           options={levelOptions.map(opt => ({
             value: opt.value,
-            label: `${opt.label} - ${studyHabitLabels[opt.value as keyof typeof studyHabitLabels]}`
+            label: `${opt.label} - ${studyHabitLabels[opt.value]}`
           }))}
           placeholder="Select your preference"
           error={Boolean(errors.studyHabit)}
@@ -841,7 +400,6 @@ export function RegisterForm() {
         {errors.studyHabit && <p className="text-xs text-red-700">{errors.studyHabit.message}</p>}
       </div>
 
-      {/* Routine Strictness */}
       <div className="space-y-1">
         <label className="text-sm font-semibold text-stone-900 flex items-center gap-1">
           <Clock className="size-3.5" /> Routine strictness
@@ -851,7 +409,7 @@ export function RegisterForm() {
           onChange={(val) => setValue("routineStrictness", val)}
           options={levelOptions.map(opt => ({
             value: opt.value,
-            label: `${opt.label} - ${routineStrictnessLabels[opt.value as keyof typeof routineStrictnessLabels]}`
+            label: `${opt.label} - ${routineStrictnessLabels[opt.value]}`
           }))}
           placeholder="Select your preference"
           error={Boolean(errors.routineStrictness)}
@@ -860,7 +418,6 @@ export function RegisterForm() {
         {errors.routineStrictness && <p className="text-xs text-red-700">{errors.routineStrictness.message}</p>}
       </div>
 
-      {/* Adaptability */}
       <div className="space-y-1">
         <label className="text-sm font-semibold text-stone-900 flex items-center gap-1">
           <RefreshCw className="size-3.5" /> Adaptability
@@ -870,7 +427,7 @@ export function RegisterForm() {
           onChange={(val) => setValue("adaptability", val)}
           options={levelOptions.map(opt => ({
             value: opt.value,
-            label: `${opt.label} - ${adaptabilityLabels[opt.value as keyof typeof adaptabilityLabels]}`
+            label: `${opt.label} - ${adaptabilityLabels[opt.value]}`
           }))}
           placeholder="Select your preference"
           error={Boolean(errors.adaptability)}
@@ -879,12 +436,112 @@ export function RegisterForm() {
         {errors.adaptability && <p className="text-xs text-red-700">{errors.adaptability.message}</p>}
       </div>
 
+      {/* ========== ROOMMATE PREFERENCE ========== */}
+      <div className="border-b border-stone-200 pb-3 mt-4 mb-2">
+        <h3 className="text-sm font-bold text-stone-800">Roommate Preference</h3>
+        <p className="text-xs text-stone-500 mt-0.5">Choose how you want to be assigned a roommate</p>
+      </div>
+
+      <RoommatePreference
+        value={watchRoommatePreference}
+        onChange={(val) => setValue("roommatePreference", val)}
+        error={errors}
+      />
+
+      {isFriendSelected && (
+        <div className="space-y-3 rounded-2xl border border-[#9d7443]/30 bg-amber-50/50 p-4">
+          <p className="text-sm font-semibold text-stone-800 flex items-center gap-2">
+            <UserPlus className="size-4 text-[#9d7443]" />
+            Friend Information
+          </p>
+          <p className="text-xs text-stone-500">Please provide your friend's current residence details</p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-semibold text-stone-900">Friend's full name</label>
+              <input
+                {...register("friendName")}
+                type="text"
+                placeholder="Enter friend's full name"
+                className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition placeholder:text-stone-400 ${
+                  errors.friendName
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-stone-950/15 focus:border-stone-950/45"
+                }`}
+              />
+              {errors.friendName && <p className="text-xs text-red-700">{errors.friendName.message}</p>}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-stone-900">Friend's Student ID</label>
+              <input
+                {...register("friendStudentId")}
+                type="text"
+                placeholder="Enter friend's student ID"
+                className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition placeholder:text-stone-400 ${
+                  errors.friendStudentId
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-stone-950/15 focus:border-stone-950/45"
+                }`}
+              />
+              {errors.friendStudentId && <p className="text-xs text-red-700">{errors.friendStudentId.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-sm font-semibold text-stone-900">Block</label>
+                <input
+                  {...register("friendBlock")}
+                  type="text"
+                  placeholder="e.g., A"
+                  className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition placeholder:text-stone-400 ${
+                    errors.friendBlock
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-stone-950/15 focus:border-stone-950/45"
+                  }`}
+                />
+                {errors.friendBlock && <p className="text-xs text-red-700">{errors.friendBlock.message}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-stone-900">Floor</label>
+                <input
+                  {...register("friendFloor")}
+                  type="text"
+                  placeholder="e.g., 3"
+                  className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition placeholder:text-stone-400 ${
+                    errors.friendFloor
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-stone-950/15 focus:border-stone-950/45"
+                  }`}
+                />
+                {errors.friendFloor && <p className="text-xs text-red-700">{errors.friendFloor.message}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-stone-900">Room</label>
+                <input
+                  {...register("friendRoom")}
+                  type="text"
+                  placeholder="e.g., 304"
+                  className={`h-12 w-full rounded-2xl border bg-white px-4 text-sm font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition placeholder:text-stone-400 ${
+                    errors.friendRoom
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-stone-950/15 focus:border-stone-950/45"
+                  }`}
+                />
+                {errors.friendRoom && <p className="text-xs text-red-700">{errors.friendRoom.message}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========== PASSWORD ========== */}
       <div className="border-b border-stone-200 pb-3 mt-4 mb-2">
         <h3 className="text-sm font-bold text-stone-800">Security</h3>
       </div>
 
-      {/* Password + Confirm */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-semibold text-stone-900">Password</label>
@@ -929,7 +586,6 @@ export function RegisterForm() {
         </div>
       </div>
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={isSubmitting}
