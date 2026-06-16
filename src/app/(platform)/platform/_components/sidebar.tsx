@@ -58,14 +58,14 @@ const menuItems: MenuItem[] = [
     label: "Residents", 
     submenu: [
       { label: "Students", href: "/platform/residents/students" },
-      { label: "Accounts", href: "/platform/residents/accounts" },
+      { label: "Assignments", href: "/platform/residents/assignments" },
     ]
   },
   { 
     icon: ClipboardList, 
     label: "Operations", 
     submenu: [
-      { label: "Rooms", href: "/platform/operations/rooms" },
+      // { label: "Rooms", href: "/platform/operations/rooms" },
       { label: "Complaints", href: "/platform/operations/complaints" },
       { label: "Tickets", href: "/platform/operations/tickets" },
       // { label: "Chat", href: "/platform/operations/chat" },
@@ -91,7 +91,7 @@ const menuItems: MenuItem[] = [
     label: "Settings", 
     submenu: [
       { label: "Residence Structure", href: "/platform/settings/structure" },
-      // { label: "AI Assistant", href: "/platform/settings/ai-assistant" },
+      { label: "AI Assistant", href: "/platform/settings/ai-assistant" },
       { label: "Activity Logs", href: "/platform/settings/activity-logs" },
     ]
   },

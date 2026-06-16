@@ -1,5 +1,5 @@
 // app/(platform)/settings/structure/_components/mockData.ts
-import { Block, Floor, RoomType } from './types';
+import { Block, Floor, RoomType, Room } from './types';
 
 export const blocks: Block[] = [
   {
@@ -146,4 +146,23 @@ export const roomTypes: RoomType[] = [
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2025-05-01T00:00:00Z',
   },
+];
+
+// NEW: Rooms data
+export const rooms: Room[] = [
+  // Block A - Floor 1
+  { id: 'room-1', roomNumber: 'A101', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-1', floorLevel: 1, roomTypeId: 'type-1', roomTypeName: 'Standard Quad', capacity: 4, currentOccupants: 4, status: 'occupied', genderRestriction: 'male', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-2', roomNumber: 'A102', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-1', floorLevel: 1, roomTypeId: 'type-1', roomTypeName: 'Standard Quad', capacity: 4, currentOccupants: 3, status: 'occupied', genderRestriction: 'male', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-3', roomNumber: 'A103', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-1', floorLevel: 1, roomTypeId: 'type-1', roomTypeName: 'Standard Quad', capacity: 4, currentOccupants: 2, status: 'available', genderRestriction: 'male', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-4', roomNumber: 'A104', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-1', floorLevel: 1, roomTypeId: 'type-1', roomTypeName: 'Standard Quad', capacity: 4, currentOccupants: 0, status: 'maintenance', genderRestriction: 'male', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  
+  // Block A - Floor 2
+  { id: 'room-5', roomNumber: 'A201', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-2', floorLevel: 2, roomTypeId: 'type-3', roomTypeName: 'Premium Double', capacity: 2, currentOccupants: 2, status: 'occupied', genderRestriction: 'all', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-6', roomNumber: 'A202', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-2', floorLevel: 2, roomTypeId: 'type-3', roomTypeName: 'Premium Double', capacity: 2, currentOccupants: 1, status: 'available', genderRestriction: 'all', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-7', roomNumber: 'A203', blockId: 'block-1', blockName: 'Block A', floorId: 'floor-1-2', floorLevel: 2, roomTypeId: 'type-4', roomTypeName: 'VIP Suite', capacity: 1, currentOccupants: 1, status: 'occupied', genderRestriction: 'all', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  
+  // Block B - Floor 1
+  { id: 'room-8', roomNumber: 'B101', blockId: 'block-2', blockName: 'Block B', floorId: 'floor-2-1', floorLevel: 1, roomTypeId: 'type-2', roomTypeName: 'Standard Six', capacity: 6, currentOccupants: 6, status: 'occupied', genderRestriction: 'female', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-9', roomNumber: 'B102', blockId: 'block-2', blockName: 'Block B', floorId: 'floor-2-1', floorLevel: 1, roomTypeId: 'type-2', roomTypeName: 'Standard Six', capacity: 6, currentOccupants: 4, status: 'available', genderRestriction: 'female', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
+  { id: 'room-10', roomNumber: 'B103', blockId: 'block-2', blockName: 'Block B', floorId: 'floor-2-1', floorLevel: 1, roomTypeId: 'type-2', roomTypeName: 'Standard Six', capacity: 6, currentOccupants: 0, status: 'reserved', genderRestriction: 'female', createdAt: '2024-01-15T00:00:00Z', updatedAt: '2025-05-20T00:00:00Z' },
 ];
