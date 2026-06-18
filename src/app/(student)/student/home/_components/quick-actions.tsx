@@ -6,9 +6,9 @@ import { ArrowRight, Bot, MessageCircle, Wrench } from "lucide-react";
 import { motion } from "framer-motion";
 
 const quickActions = [
-  { label: "Report an issue", href: "/student/residence/requests", icon: Wrench },
-  { label: "Ask Dormly", href: "/student/ai-assistant", icon: Bot },
-  { label: "Message office", href: "/student/chat", icon: MessageCircle },
+  { label: "Report an issue", href: "/student/requests", icon: Wrench },
+  { label: "Ask Dormly", href: "/student/chat/ai", icon: Bot },
+  // { label: "Message office", href: "/student/chat", icon: MessageCircle },
 ];
 
 export function QuickActions() {
