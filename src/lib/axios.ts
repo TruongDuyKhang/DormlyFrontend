@@ -6,7 +6,7 @@ export const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost
 
 // Các path public không cần token
 const PUBLIC_API_PATHS = [
-  "/api/v1/auth/login",        // 👈 Sửa đúng path
+  "/api/v1/auth/login",      
   "/api/v1/auth/register",
   "/api/v1/auth/verify-otp",
   "/api/v1/auth/forget-password",
