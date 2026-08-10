@@ -1,16 +1,21 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import { useRoleGuard } from "@/hooks/useRoleGuard";
 import { ThemeProvider } from "next-themes";
 import { Header } from "./_components/header";
 import { Sidebar } from "./_components/sidebar";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
-export default function AdminLayout({
+// Roles từ backend: "Manager", "Admin", "Staff"
+const PLATFORM_ROLES = ["Manager", "Admin", "Staff"];
+
+export default function PlatformLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { checked, loading } = useRoleGuard(PLATFORM_ROLES, "/student/home");
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -28,6 +33,14 @@ export default function AdminLayout({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  if (loading || !checked) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#e8e2d8]">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <div className="min-h-[100dvh] bg-[#e8e2d8] text-stone-950">
@@ -44,10 +57,11 @@ export default function AdminLayout({
           )}
         >
           <Header onMenuClick={() => setSidebarCollapsed(false)} />
-          <main className="px-3 pb-5 pt-3 sm:px-5 sm:pb-8 lg:px-7">{children}</main>
+          <main className="px-3 pb-5 pt-3 sm:px-5 sm:pb-8 lg:px-7">
+            {children}
+          </main>
         </div>
       </div>
     </ThemeProvider>
   );
 }
- 

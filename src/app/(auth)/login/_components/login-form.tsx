@@ -5,31 +5,23 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+} from "lucide-react";
+import { useAuth } from "@/app/(auth)/context/auth-context";
 
 const loginSchema = z.object({
-  identifier: z.string().email("Please enter a valid email address."),
+  email: z.string().email("Please enter a valid email address."),
   password: z.string().min(6, "Password must be at least 6 characters."),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-// Mock user database
-const users = [
-  {
-    email: "student@gmail.com",
-    password: "student",
-    role: "student",
-    redirect: "/student/home",
-  },
-  {
-    email: "admin@gmail.com",
-    password: "admin1",
-    role: "admin",
-    redirect: "/platform/dashboard",
-  },
-];
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -37,7 +29,7 @@ function getErrorMessage(error: unknown) {
 }
 
 export function LoginForm() {
-  const router = useRouter();
+  const { login } = useAuth(); // Lấy login từ context
   const [showPassword, setShowPassword] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,50 +42,32 @@ export function LoginForm() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      identifier: "",
+      email: "",
       password: "",
     },
   });
-
-  const mockLogin = async (email: string, password: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Find user by email
-    const user = users.find(u => u.email === email);
-    
-    if (!user) {
-      throw new Error("Account not found. Please check your email.");
-    }
-    
-    if (user.password !== password) {
-      throw new Error("Invalid email or password.");
-    }
-    
-    return user;
-  };
 
   const onSubmit = async (values: LoginFormValues) => {
     setBannerError(null);
     setIsSubmitting(true);
 
     try {
-      const user = await mockLogin(values.identifier, values.password);
-      
-      // Store user info in localStorage
-      localStorage.setItem("dormly_user", JSON.stringify({
-        email: user.email,
-        role: user.role,
-      }));
-      
-      // Redirect based on role
-      router.push(user.redirect);
+      // Gọi login từ context - nó sẽ tự xử lý:
+      // 1. Gọi API
+      // 2. Lưu token
+      // 3. Set user state
+      // 4. Redirect (thông qua useEffect trong AuthProvider)
+      await login(values.email, values.password);
     } catch (error: unknown) {
       const message = getErrorMessage(error);
       const lowerMessage = message.toLowerCase();
 
       if (lowerMessage.includes("email") || lowerMessage.includes("account")) {
-        setError("identifier", { type: "server", message });
-      } else if (lowerMessage.includes("password") || lowerMessage.includes("invalid")) {
+        setError("email", { type: "server", message });
+      } else if (
+        lowerMessage.includes("password") ||
+        lowerMessage.includes("invalid")
+      ) {
         setError("password", { type: "server", message });
       } else {
         setBannerError(message);
@@ -107,42 +81,57 @@ export function LoginForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {bannerError && (
         <div className="flex items-start gap-3 rounded-2xl border border-red-900/15 bg-red-50/80 p-4">
-          <AlertCircle className="mt-0.5 size-5 shrink-0 text-red-700" strokeWidth={1.5} />
+          <AlertCircle
+            className="mt-0.5 size-5 shrink-0 text-red-700"
+            strokeWidth={1.5}
+          />
           <p className="text-sm leading-relaxed text-red-800">{bannerError}</p>
         </div>
       )}
 
       <div className="space-y-2">
-        <label htmlFor="identifier" className="block text-base font-semibold text-stone-900">
+        <label
+          htmlFor="email"
+          className="block text-base font-semibold text-stone-900"
+        >
           Email address
         </label>
         <div className="relative">
-          <Mail className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-stone-400" strokeWidth={1.5} />
+          <Mail
+            className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-stone-400"
+            strokeWidth={1.5}
+          />
           <input
-            id="identifier"
-            {...register("identifier")}
+            id="email"
+            {...register("email")}
             type="email"
-            placeholder="student@gmail.com or admin@gmail.com"
+            placeholder="student@gmail.com"
             autoComplete="email"
-            aria-invalid={Boolean(errors.identifier)}
+            aria-invalid={Boolean(errors.email)}
             className={`h-16 w-full rounded-[1.35rem] border bg-white pl-14 pr-5 text-base font-medium text-stone-950 shadow-[0_18px_56px_-34px_rgba(28,25,23,0.92)] outline-none transition placeholder:font-normal placeholder:text-stone-400 focus:bg-white focus:shadow-[0_22px_72px_-34px_rgba(28,25,23,0.95)] ${
-              errors.identifier
+              errors.email
                 ? "border-red-400 focus:border-red-500"
                 : "border-stone-950/18 focus:border-stone-950/55"
             }`}
           />
         </div>
-        {errors.identifier && (
-          <p className="text-sm text-red-700">{errors.identifier.message}</p>
+        {errors.email && (
+          <p className="text-sm text-red-700">{errors.email.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="password" className="block text-base font-semibold text-stone-900">
+        <label
+          htmlFor="password"
+          className="block text-base font-semibold text-stone-900"
+        >
           Password
         </label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-stone-400" strokeWidth={1.5} />
+          <Lock
+            className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-stone-400"
+            strokeWidth={1.5}
+          />
           <input
             id="password"
             {...register("password")}
@@ -162,7 +151,11 @@ export function LoginForm() {
             aria-label={showPassword ? "Hide password" : "Show password"}
             className="absolute right-4 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-stone-500 transition hover:bg-stone-950/5 hover:text-stone-950"
           >
-            {showPassword ? <EyeOff className="size-4" strokeWidth={1.5} /> : <Eye className="size-4" strokeWidth={1.5} />}
+            {showPassword ? (
+              <EyeOff className="size-4" strokeWidth={1.5} />
+            ) : (
+              <Eye className="size-4" strokeWidth={1.5} />
+            )}
           </button>
         </div>
         {errors.password && (
@@ -172,13 +165,15 @@ export function LoginForm() {
 
       {/* Demo credentials hint */}
       <div className="rounded-xl bg-stone-50 p-3 text-center">
-        <p className="text-xs text-stone-500">
-          Demo accounts:
-        </p>
+        <p className="text-xs text-stone-500">Demo accounts:</p>
         <div className="mt-1 flex flex-wrap justify-center gap-3 text-xs">
-          <span className="font-mono text-stone-600">student@gmail.com / student</span>
+          <span className="font-mono text-stone-600">
+            student@gmail.com / student
+          </span>
           <span className="text-stone-300">|</span>
-          <span className="font-mono text-stone-600">admin@gmail.com / admin1</span>
+          <span className="font-mono text-stone-600">
+            admin@gmail.com / admin1
+          </span>
         </div>
       </div>
 
@@ -195,7 +190,10 @@ export function LoginForm() {
         ) : (
           <>
             Sign in
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" strokeWidth={1.5} />
+            <ArrowRight
+              className="size-4 transition-transform group-hover:translate-x-1"
+              strokeWidth={1.5}
+            />
           </>
         )}
       </button>

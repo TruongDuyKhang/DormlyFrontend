@@ -1,128 +1,209 @@
-// app/(student)/requests/_components/create-request-modal.tsx
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Wrench, MessageSquare, ArrowRight, Upload, XCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useRef, useState } from "react";
+import {
+  X,
+  Wrench,
+  Building2,
+  Users,
+  ShieldAlert,
+  Receipt,
+  HelpCircle,
+  Upload,
+  XCircle,
+  Loader2,
+} from "lucide-react";
+import type { CreateTicketPayload, TicketCategory } from "../types/ticket";
 
 interface CreateRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (data: any) => void;
-  userLocation?: string; // Thêm prop location từ thông tin sinh viên
+  onCreate: (payload: CreateTicketPayload, files: File[]) => Promise<unknown>;
 }
 
-const requestTypes = [
-  { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Electrical, plumbing, internet, furniture..." },
-  { id: "complaint", label: "Complaint", icon: MessageSquare, description: "Noise, cleanliness, conflict..." },
-  { id: "transfer", label: "Room Transfer", icon: ArrowRight, description: "Request room change with reason" },
+const categoryOptions: {
+  id: TicketCategory;
+  label: string;
+  icon: any;
+  description: string;
+}[] = [
+  {
+    id: "MAINTENANCE",
+    label: "Maintenance",
+    icon: Wrench,
+    description: "Electrical, plumbing, internet, furniture...",
+  },
+  {
+    id: "FACILITY",
+    label: "Facility",
+    icon: Building2,
+    description: "Common area, elevator, shared equipment...",
+  },
+  {
+    id: "ROOMMATE",
+    label: "Roommate",
+    icon: Users,
+    description: "Conflict, noise, cleanliness with roommate...",
+  },
+  {
+    id: "SECURITY",
+    label: "Security",
+    icon: ShieldAlert,
+    description: "Safety, unauthorized access, theft...",
+  },
+  {
+    id: "BILLING",
+    label: "Billing",
+    icon: Receipt,
+    description: "Invoice, payment, fee questions...",
+  },
+  {
+    id: "OTHER",
+    label: "Other",
+    icon: HelpCircle,
+    description: "Anything else",
+  },
 ];
 
-const maintenanceSubTypes = [
-  "Electrical", "Plumbing", "Internet", "Furniture", "Equipment", "Hygiene"
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
 ];
 
-const complaintSubTypes = [
-  "Noise", "Cleanliness", "Conflict", "Rule Violation", "Other"
-];
-
-export function CreateRequestModal({ isOpen, onClose, onCreate, userLocation = "Room A304, Block A, Floor 3" }: CreateRequestModalProps) {
+export function CreateRequestModal({
+  isOpen,
+  onClose,
+  onCreate,
+}: CreateRequestModalProps) {
   const [step, setStep] = useState<"type" | "form">("type");
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [subType, setSubType] = useState("");
+  const [category, setCategory] = useState<TicketCategory | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const handleTypeSelect = (type: string) => {
-    setSelectedType(type);
+  const handleCategorySelect = (id: TicketCategory) => {
+    setCategory(id);
     setStep("form");
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const newPreviewUrls = files.map(file => URL.createObjectURL(file));
-    setAttachments(prev => [...prev, ...files]);
-    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    setFileError(null);
+
+    const combined = [...attachments, ...files];
+    if (combined.length > MAX_FILES) {
+      setFileError(`Bạn chỉ được đính kèm tối đa ${MAX_FILES} file.`);
+      return;
+    }
+    const invalid = files.find((f) => !ALLOWED_TYPES.includes(f.type));
+    if (invalid) {
+      setFileError(
+        `File không hỗ trợ: ${invalid.name}. Chỉ nhận PNG/JPEG/GIF/WEBP/PDF.`,
+      );
+      return;
+    }
+    const tooBig = files.find((f) => f.size > MAX_FILE_SIZE);
+    if (tooBig) {
+      setFileError(`"${tooBig.name}" vượt quá 10MB.`);
+      return;
+    }
+
+    setAttachments(combined);
+    setPreviewUrls((prev) => [
+      ...prev,
+      ...files.map((f) => URL.createObjectURL(f)),
+    ]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const removeAttachment = (index: number) => {
     URL.revokeObjectURL(previewUrls[index]);
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = () => {
-    onCreate({
-      type: selectedType,
-      subType,
-      title,
-      description,
-      location: userLocation, // Tự động lấy từ thông tin sinh viên
-      attachments,
-    });
-    onClose();
-    resetForm();
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
   const resetForm = () => {
     setStep("type");
-    setSelectedType(null);
+    setCategory(null);
     setTitle("");
     setDescription("");
-    setSubType("");
     setAttachments([]);
-    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
     setPreviewUrls([]);
+    setFileError(null);
   };
 
-  const subTypes = selectedType === "maintenance" 
-    ? maintenanceSubTypes 
-    : selectedType === "complaint" 
-    ? complaintSubTypes 
-    : [];
+  const handleClose = () => {
+    onClose();
+    resetForm();
+  };
+
+  const handleSubmit = async () => {
+    if (!category || !title.trim() || !description.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await onCreate(
+        { category, title: title.trim(), description: description.trim() },
+        attachments,
+      );
+      handleClose();
+    } catch {
+
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-auto rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
         <div className="sticky top-0 flex items-center justify-between border-b border-stone-200 bg-white p-4">
           <h2 className="text-xl font-semibold text-stone-900">
-            {step === "type" ? "New Request" : `New ${selectedType} Request`}
+            {step === "type"
+              ? "New Request"
+              : `New ${categoryOptions.find((c) => c.id === category)?.label} Request`}
           </h2>
           <button
-            onClick={() => {
-              onClose();
-              resetForm();
-            }}
+            onClick={handleClose}
             className="rounded-full p-1 hover:bg-stone-100"
           >
             <X className="h-5 w-5 text-stone-500" />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
           {step === "type" ? (
             <div className="space-y-3">
-              {requestTypes.map((type) => {
-                const Icon = type.icon;
+              {categoryOptions.map((opt) => {
+                const Icon = opt.icon;
                 return (
                   <button
-                    key={type.id}
-                    onClick={() => handleTypeSelect(type.id)}
+                    key={opt.id}
+                    onClick={() => handleCategorySelect(opt.id)}
                     className="flex w-full items-start gap-4 rounded-xl border border-stone-200 p-4 text-left transition hover:border-[#9d7443] hover:bg-stone-50"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100">
                       <Icon className="h-5 w-5 text-stone-600" />
                     </div>
                     <div>
-                      <p className="font-semibold text-stone-900">{type.label}</p>
-                      <p className="text-sm text-stone-500">{type.description}</p>
+                      <p className="font-semibold text-stone-900">
+                        {opt.label}
+                      </p>
+                      <p className="text-sm text-stone-500">
+                        {opt.description}
+                      </p>
                     </div>
                   </button>
                 );
@@ -130,38 +211,13 @@ export function CreateRequestModal({ isOpen, onClose, onCreate, userLocation = "
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Location - Hiển thị tự động, không cho sửa */}
               <div className="rounded-xl bg-stone-50 p-3">
-                <p className="text-xs text-stone-500">Location (auto-detected)</p>
-                <p className="mt-1 text-sm font-medium text-stone-800">{userLocation}</p>
+                <p className="text-xs text-stone-500">Location</p>
+                <p className="mt-1 text-sm font-medium text-stone-800">
+                  Filed against your current room assignment
+                </p>
               </div>
 
-              {/* Sub Type */}
-              {subTypes.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-2">
-                    Sub Category
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {subTypes.map((st) => (
-                      <button
-                        key={st}
-                        onClick={() => setSubType(st)}
-                        className={cn(
-                          "rounded-full px-3 py-1.5 text-sm transition",
-                          subType === st
-                            ? "bg-[#2f2a24] text-white"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        )}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-2">
                   Title <span className="text-red-500">*</span>
@@ -170,12 +226,12 @@ export function CreateRequestModal({ isOpen, onClose, onCreate, userLocation = "
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  maxLength={200}
                   placeholder="e.g., Air Conditioner Not Working"
                   className="w-full rounded-xl border border-stone-200 p-3 text-sm focus:border-[#9d7443] focus:outline-none"
                 />
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-2">
                   Description <span className="text-red-500">*</span>
@@ -189,15 +245,14 @@ export function CreateRequestModal({ isOpen, onClose, onCreate, userLocation = "
                 />
               </div>
 
-              {/* Attachments */}
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-2">
-                  Attachments (Photos / Videos)
+                  Attachments (Images / PDF, tối đa 5, mỗi file ≤10MB)
                 </label>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
                   multiple
                   onChange={handleFileSelect}
                   className="hidden"
@@ -210,17 +265,25 @@ export function CreateRequestModal({ isOpen, onClose, onCreate, userLocation = "
                   <Upload className="h-4 w-4" />
                   Upload Files
                 </button>
-                
-                {/* Preview images */}
-                {previewUrls.length > 0 && (
+                {fileError && (
+                  <p className="mt-2 text-xs text-red-600">{fileError}</p>
+                )}
+
+                {attachments.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {previewUrls.map((url, idx) => (
+                    {attachments.map((file, idx) => (
                       <div key={idx} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Preview ${idx + 1}`}
-                          className="h-20 w-20 rounded-lg object-cover border border-stone-200"
-                        />
+                        {file.type === "application/pdf" ? (
+                          <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 p-1 text-center text-xs text-stone-500">
+                            {file.name}
+                          </div>
+                        ) : (
+                          <img
+                            src={previewUrls[idx]}
+                            alt={`Preview ${idx + 1}`}
+                            className="h-20 w-20 rounded-lg object-cover border border-stone-200"
+                          />
+                        )}
                         <button
                           onClick={() => removeAttachment(idx)}
                           className="absolute -top-2 -right-2 rounded-full bg-red-500 p-0.5 text-white opacity-0 group-hover:opacity-100 transition"
@@ -232,25 +295,36 @@ export function CreateRequestModal({ isOpen, onClose, onCreate, userLocation = "
                   </div>
                 )}
               </div>
+
+
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 flex justify-end gap-3 border-t border-stone-200 bg-white p-4">
           {step === "form" && (
             <button
               onClick={() => setStep("type")}
-              className="rounded-full px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100"
+              disabled={isSubmitting}
+              className="rounded-full px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-50"
             >
               Back
             </button>
           )}
           <button
-            onClick={step === "type" ? onClose : handleSubmit}
-            className="rounded-full bg-[#2f2a24] px-6 py-2 text-sm font-medium text-white transition hover:bg-[#40382f]"
+            onClick={step === "type" ? handleClose : handleSubmit}
+            disabled={
+              step === "form" &&
+              (!title.trim() || !description.trim() || isSubmitting)
+            }
+            className="inline-flex items-center gap-2 rounded-full bg-[#2f2a24] px-6 py-2 text-sm font-medium text-white transition hover:bg-[#40382f] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {step === "type" ? "Cancel" : "Submit Request"}
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {step === "type"
+              ? "Cancel"
+              : isSubmitting
+                ? "Submitting..."
+                : "Submit Request"}
           </button>
         </div>
       </div>
