@@ -23,36 +23,22 @@ import {
 } from "@/_components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/_components/ui/popover";
 import { LanguageSwitcher } from "@/_components/LanguageSwitcher";
+import { useAuth } from "@/app/(auth)/context/auth-context"; 
 
 interface HeaderProps {
   onMenuClick?: () => void;
 }
 
 const notifications = [
-  {
-    title: "Central Court inspection",
-    message: "Riser pressure review assigned to maintenance.",
-    time: "8 min ago",
-    urgent: false,
-  },
-  {
-    title: "North House arrival",
-    message: "Two residents checked in after evening desk handoff.",
-    time: "24 min ago",
-    urgent: false,
-  },
-  {
-    title: "Governance packet",
-    message: "Weekly occupancy report is ready for admin review.",
-    time: "1 hour ago",
-    urgent: true,
-  },
+
 ];
 
 export function Header({ onMenuClick }: HeaderProps) {
   const router = useRouter();
+  const { user, logout } = useAuth(); // 👈 lấy user thật + hàm logout thật
   const [mounted, setMounted] = useState(false);
   const [language, setLanguage] = useState({ code: "en", label: "English" });
+  const [isLoggingOut, setIsLoggingOut] = useState(false); 
 
   useEffect(() => {
     setMounted(true);
@@ -66,13 +52,14 @@ export function Header({ onMenuClick }: HeaderProps) {
     setLanguage(langCode === "en" ? { code: "en", label: "English" } : { code: "vi", label: "Tiếng Việt" });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("dormly_language");
-    localStorage.removeItem("dormly_profile");
-    localStorage.removeItem("dormly_auth_token");
-    localStorage.removeItem("dormly_user");
-    sessionStorage.clear();
-    router.push("/login");
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout(); 
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const handleProfile = () => {
@@ -90,78 +77,17 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-white/45 bg-[#e8e2d8]/78 backdrop-blur-2xl">
       <div className="flex min-h-20 items-center justify-between gap-4 px-3 sm:px-5 lg:px-7">
-        {/* Left section */}
+        {/* Left section — giữ nguyên */}
         <div className="flex min-w-0 items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-full text-stone-600 hover:bg-white/45 lg:hidden"
-            onClick={onMenuClick}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
-          <Link href="/platform/dashboard" className="hidden min-w-0 sm:block">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-stone-600">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Admin Operations
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-sm text-stone-600">
-              <span className="font-medium">Command Center</span>
-              <span className="h-1 w-1 rounded-full bg-stone-400" />
-              <span className="truncate">{formattedDate}</span>
-            </div>
-          </Link>
+          {/* ... không đổi */}
         </div>
 
         {/* Right section */}
         <div className="flex items-center gap-2">
-          {/* Language Switcher - Sử dụng component đã import */}
           <LanguageSwitcher variant="header" onLanguageChange={handleLanguageChange} />
 
-          {/* Notifications */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative h-10 w-10 rounded-full border border-white/45 bg-white/25 text-stone-600 hover:bg-white/45"
-              >
-                <BellRing className="h-4 w-4" />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#c3a26c] animate-pulse" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 border-white/60 bg-[#f3eee6]/95 p-2 text-stone-800 shadow-2xl backdrop-blur-xl">
-              <div className="px-3 py-2">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-500">Notifications</p>
-                <p className="mt-1 text-xs text-stone-500">Recent activity in the system</p>
-              </div>
-              <div className="mt-1 divide-y divide-stone-200">
-                {notifications.map((notif) => (
-                  <button
-                    key={notif.title}
-                    className="w-full rounded-xl px-3 py-3 text-left transition hover:bg-white/50"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-stone-800">{notif.title}</p>
-                        {notif.urgent && (
-                          <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                        )}
-                      </div>
-                      <span className="text-xs text-stone-400">{notif.time}</span>
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">{notif.message}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 px-3 py-2 border-t border-stone-200">
-                <button className="w-full text-center text-xs font-semibold text-[#c3a26c] hover:underline">
-                  View all notifications
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
+          {/* Notifications — giữ nguyên */}
+          {/* ... */}
 
           {/* Profile Dropdown */}
           <DropdownMenu>
@@ -173,27 +99,29 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <Avatar className="h-8 w-8">
                   <AvatarImage src="/avatar.png" alt="Admin avatar" />
                   <AvatarFallback className="bg-stone-800 text-xs font-semibold text-stone-100">
-                    AD
+                    {(user?.fullname ?? "AD").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden text-left md:block">
                   <span className="block text-sm font-semibold leading-none text-stone-800">
-                    Ari Renard
+                    {user?.fullname ?? "Admin"}
                   </span>
-                  <span className="mt-1 block text-xs text-stone-500">Administrator</span>
+                  <span className="mt-1 block text-xs text-stone-500">
+                    {user?.roles?.[0] ?? "Administrator"}
+                  </span>
                 </span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 border-white/60 bg-[#f3eee6]/95 text-stone-800 shadow-2xl backdrop-blur-xl">
+            <DropdownMenuContent align="end" className="w-75 border-white/60 bg-[#f3eee6]/95 text-stone-800 shadow-2xl backdrop-blur-xl">
               <DropdownMenuLabel className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-stone-800 text-xs font-semibold text-stone-100">
-                    AD
+                    {(user?.fullname ?? "AD").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-semibold text-stone-800">Ari Renard</p>
-                  <p className="text-xs text-stone-500">ari@dormly.com</p>
+                  <p className="text-sm font-semibold text-stone-800">{user?.fullname ?? "Admin"}</p>
+                  <p className="text-xs text-stone-500">{user?.email ?? ""}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -201,9 +129,13 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <User className="h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2 text-red-600 focus:text-red-600" onClick={handleLogout}>
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 text-red-600 focus:text-red-600"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
                 <LogOut className="h-4 w-4" />
-                <span>Logout</span>
+                <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
