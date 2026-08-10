@@ -14,6 +14,9 @@ import {
   User,
   LogOut,
   Settings,
+  Phone,
+  Mail,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/_components/LanguageSwitcher";
@@ -38,48 +41,13 @@ const items = [
   { label: "Residence", href: "/student/residence/room", icon: Sparkles },
   { label: "Requests", href: "/student/requests", icon: Bell },
   // { label: "Community", href: "/student/community/feed", icon: MessageCircle },
-   { label: "Chat", href: "/student/chat", icon: Bot },
+  { label: "Chat", href: "/student/chat", icon: Bot },
   { label: "Profile", href: "/student/profile/account", icon: User },
-];
-
-// Mock notifications
-const notifications = [
-  {
-    id: "1",
-    title: "Maintenance Update",
-    message: "Your AC repair request has been assigned to a technician.",
-    time: "5 min ago",
-    read: false,
-  },
-  {
-    id: "2",
-    title: "Document Approved",
-    message: "Your Citizen ID has been verified by the residence office.",
-    time: "1 hour ago",
-    read: false,
-  },
-  {
-    id: "3",
-    title: "Event Reminder",
-    message: "Football Tournament starts tomorrow at 8:00 AM.",
-    time: "3 hours ago",
-    read: true,
-  },
-  {
-    id: "4",
-    title: "Room Transfer",
-    message: "Your room transfer request has been approved.",
-    time: "Yesterday",
-    read: true,
-  },
 ];
 
 export function StudentShellNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [unreadCount, setUnreadCount] = useState(
-    notifications.filter((n) => !n.read).length
-  );
 
   const isActive = (label: string, href: string) => {
     if (label === "Residence") {
@@ -112,16 +80,15 @@ export function StudentShellNav() {
     router.push("/student/profile/settings");
   };
 
-  const handleMarkAsRead = (id: string) => {
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
-
   return (
     <>
       {/* Desktop Header */}
       <div className="hidden lg:flex items-center justify-between w-full">
         {/* Logo bên trái */}
-        <Link href="/student/home" className="flex items-center gap-3 flex-shrink-0">
+        <Link
+          href="/student/home"
+          className="flex items-center gap-3 flex-shrink-0"
+        >
           <div className="w-14 h-14 flex-shrink-0 flex items-center justify-center">
             <Image
               src="/logo_black.png"
@@ -156,13 +123,13 @@ export function StudentShellNav() {
                   "flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition duration-300 active:scale-[0.98]",
                   active
                     ? "bg-[#2f2a24] text-stone-50 shadow-[0_12px_28px_-18px_rgba(47,42,36,0.8)]"
-                    : "text-stone-600 hover:bg-white/50 hover:text-stone-900"
+                    : "text-stone-600 hover:bg-white/50 hover:text-stone-900",
                 )}
               >
                 <Icon
                   className={cn(
                     "h-4 w-4",
-                    active ? "text-[#d6bd8a]" : "text-stone-500"
+                    active ? "text-[#d6bd8a]" : "text-stone-500",
                   )}
                 />
                 {item.label}
@@ -171,70 +138,93 @@ export function StudentShellNav() {
           })}
         </nav>
 
-        {/* Bên phải - Notifications + Language Switcher + Avatar */}
+        {/* Bên phải - Emergency Contact + Notifications + Language Switcher + Avatar */}
         <div className="flex items-center gap-2">
-          {/* Notifications Button - Style theo yêu cầu */}
+          {/* Emergency Contact Button - Added here */}
           <Popover>
             <PopoverTrigger asChild>
               <button
-                aria-label="Open notifications"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/38 text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition hover:bg-white/60 active:scale-[0.98]"
+                aria-label="Emergency contact"
+                className="relative flex h-9 items-center gap-1.5 rounded-full border-2 border-red-400/80 bg-red-500/90 px-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition hover:bg-red-600/90 hover:border-red-500 active:scale-[0.98]"
               >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#a77d45]" />
-                )}
+                <AlertCircle className="h-3.5 w-3.5 text-white" />
+                <span className="text-xs font-semibold hidden xl:inline tracking-wide">
+                  Emergency
+                </span>
               </button>
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-80 border-white/60 bg-[#f3eee6]/95 p-0 text-stone-800 shadow-2xl backdrop-blur-xl"
+              className="w-72 border-red-200/60 bg-[#f3eee6]/95 p-4 text-stone-800 shadow-2xl backdrop-blur-xl"
             >
-              <div className="border-b border-stone-200 px-4 py-3">
-                <p className="text-sm font-semibold text-stone-900">Notifications</p>
-                <p className="text-xs text-stone-500">Stay updated with residence activities</p>
+              <div className="flex items-center gap-2.5 border-b-2 border-red-200 pb-2.5 mb-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-stone-900">
+                    Emergency Contact
+                  </p>
+                  <p className="text-xs text-stone-500">Available 24/7</p>
+                </div>
               </div>
-              <div className="max-h-80 overflow-y-auto">
-                {notifications.map((notif) => (
-                  <button
-                    key={notif.id}
-                    onClick={() => handleMarkAsRead(notif.id)}
-                    className={`w-full px-4 py-3 text-left transition hover:bg-white/50 ${
-                      !notif.read ? "bg-amber-50/50" : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-stone-900">
-                          {notif.title}
-                        </p>
-                        <p className="mt-0.5 text-xs text-stone-500">
-                          {notif.message}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-400">{notif.time}</p>
-                      </div>
-                      {!notif.read && (
-                        <div className="mt-1 h-2 w-2 rounded-full bg-[#9d7443]" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="border-t border-stone-200 px-4 py-2">
-                <button
-                  onClick={() => router.push("/student/notifications")}
-                  className="w-full text-center text-xs font-semibold text-[#9d7443] hover:underline"
+
+              <div className="space-y-2.5">
+                {/* Phone */}
+                <a
+                  href="tel:+842742222230"
+                  className="flex items-center gap-2.5 rounded-lg p-2.5 transition hover:bg-white/60 group border border-transparent hover:border-red-200"
                 >
-                  View all notifications
-                </button>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 group-hover:bg-red-200 group-hover:scale-105 transition-transform">
+                    <Phone className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-stone-900">
+                      Phone
+                    </p>
+                    <p className="text-xs text-stone-600 font-medium">
+                      0274 2222 230
+                    </p>
+                  </div>
+                </a>
+
+                {/* Email */}
+                <a
+                  href="mailto:Housing@eiu.edu.vn"
+                  className="flex items-center gap-2.5 rounded-lg p-2.5 transition hover:bg-white/60 group border border-transparent hover:border-blue-200"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 group-hover:bg-blue-200 group-hover:scale-105 transition-transform">
+                    <Mail className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-stone-900">
+                      Email
+                    </p>
+                    <p className="text-xs text-stone-600 font-medium truncate">
+                      Housing@eiu.edu.vn
+                    </p>
+                  </div>
+                </a>
+
+                <div className="mt-2.5 rounded-lg bg-red-50/80 p-2.5 border-2 border-red-200/60">
+                  <p className="text-xs text-stone-700 leading-relaxed">
+                    <span className="font-semibold text-red-700">
+                    For emergencies:
+                    </span>{" "}
+                    Contact security or residence staff immediately.
+                  </p>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
 
           {/* Language Switcher */}
-          <LanguageSwitcher variant="header" onLanguageChange={handleLanguageChange} />
+          <LanguageSwitcher
+            variant="header"
+            onLanguageChange={handleLanguageChange}
+          />
 
-          {/* Avatar Dropdown - Ngoài cùng bên phải */}
+          {/* Avatar Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -249,7 +239,10 @@ export function StudentShellNav() {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 border-white/60 bg-[#f3eee6]/95 backdrop-blur-xl">
+            <DropdownMenuContent
+              align="end"
+              className="w-56 border-white/60 bg-[#f3eee6]/95 backdrop-blur-xl"
+            >
               <DropdownMenuLabel className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-[#2f2a24] text-xs font-semibold text-[#d6bd8a]">
@@ -257,21 +250,32 @@ export function StudentShellNav() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-semibold text-stone-800">Trương Duy Khang</p>
+                  <p className="text-sm font-semibold text-stone-800">
+                    Trương Duy Khang
+                  </p>
                   <p className="text-xs text-stone-500">Student</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleProfile}>
+              <DropdownMenuItem
+                className="cursor-pointer gap-2"
+                onClick={handleProfile}
+              >
                 <User className="h-4 w-4" />
                 <span>My Account</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleSettings}>
+              <DropdownMenuItem
+                className="cursor-pointer gap-2"
+                onClick={handleSettings}
+              >
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2 text-red-600 focus:text-red-600" onClick={handleLogout}>
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 text-red-600 focus:text-red-600"
+                onClick={handleLogout}
+              >
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>
               </DropdownMenuItem>
@@ -295,7 +299,7 @@ export function StudentShellNav() {
                 "flex h-12 items-center justify-center rounded-[1.1rem] transition active:scale-[0.96]",
                 active
                   ? "bg-[#2f2a24] text-[#d6bd8a]"
-                  : "text-stone-500 hover:bg-white/55"
+                  : "text-stone-500 hover:bg-white/55",
               )}
             >
               <Icon className="h-[1.125rem] w-[1.125rem]" />

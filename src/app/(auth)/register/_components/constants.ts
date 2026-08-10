@@ -3,6 +3,34 @@
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 export const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
 
+// Major options - NEW
+export const majorOptions = [
+  { value: "Computer Science", label: "Computer Science" },
+  { value: "Software Engineering", label: "Software Engineering" },
+  { value: "Information Technology", label: "Information Technology" },
+  { value: "Data Science", label: "Data Science" },
+  { value: "Artificial Intelligence", label: "Artificial Intelligence" },
+  { value: "Cybersecurity", label: "Cybersecurity" },
+  { value: "Business Administration", label: "Business Administration" },
+  { value: "Marketing", label: "Marketing" },
+  { value: "Finance", label: "Finance" },
+  { value: "Accounting", label: "Accounting" },
+  { value: "Economics", label: "Economics" },
+  { value: "Mechanical Engineering", label: "Mechanical Engineering" },
+  { value: "Electrical Engineering", label: "Electrical Engineering" },
+  { value: "Civil Engineering", label: "Civil Engineering" },
+  { value: "Architecture", label: "Architecture" },
+  { value: "Design", label: "Design" },
+  { value: "Communications", label: "Communications" },
+  { value: "Psychology", label: "Psychology" },
+  { value: "Education", label: "Education" },
+  { value: "Law", label: "Law" },
+  { value: "Medicine", label: "Medicine" },
+  { value: "Nursing", label: "Nursing" },
+  { value: "Pharmacy", label: "Pharmacy" },
+  { value: "Other", label: "Other" },
+];
+
 // Sleep time options
 export const sleepTimeOptions = [
   { value: "21:00", label: "Before 10:00 PM", band: "before_22", score: 10, description: "Very early sleeper" },

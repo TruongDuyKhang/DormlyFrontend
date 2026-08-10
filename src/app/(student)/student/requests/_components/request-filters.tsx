@@ -1,29 +1,33 @@
-// app/(student)/requests/_components/request-filters.tsx
 "use client";
 
-import { Search, Wrench, MessageSquare, ArrowRight } from "lucide-react";
+import { Search, Wrench, Building2, Users, ShieldAlert, Receipt, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { TabType } from "../types/ticket";
 
 interface RequestFiltersProps {
-  activeTab: "open" | "in_progress" | "completed";
-  onTabChange: (tab: "open" | "in_progress" | "completed") => void;
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
   activeCategory: string;
   onCategoryChange: (category: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  tabCounts: Record<TabType, number>;
 }
 
-const tabs = [
+const tabs: { id: TabType; label: string }[] = [
   { id: "open", label: "Open" },
   { id: "in_progress", label: "In Progress" },
   { id: "completed", label: "Completed" },
 ];
 
 const categories = [
-  { id: "all", label: "All", icon: null },
-  { id: "maintenance", label: "Maintenance", icon: Wrench },
-  { id: "complaint", label: "Complaints", icon: MessageSquare },
-  { id: "transfer", label: "Transfers", icon: ArrowRight },
+  { id: "all", label: "All", icon: null as any },
+  { id: "MAINTENANCE", label: "Maintenance", icon: Wrench },
+  { id: "FACILITY", label: "Facility", icon: Building2 },
+  { id: "ROOMMATE", label: "Roommate", icon: Users },
+  { id: "SECURITY", label: "Security", icon: ShieldAlert },
+  { id: "BILLING", label: "Billing", icon: Receipt },
+  { id: "OTHER", label: "Other", icon: HelpCircle },
 ];
 
 export function RequestFilters({
@@ -33,32 +37,26 @@ export function RequestFilters({
   onCategoryChange,
   searchQuery,
   onSearchChange,
+  tabCounts,
 }: RequestFiltersProps) {
-  // Counts for tabs (mock)
-  const tabCounts = { open: 2, in_progress: 1, completed: 3 };
-
   return (
     <div className="space-y-4">
-      {/* Tabs with counts */}
       <div className="flex gap-1 rounded-xl bg-stone-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => onTabChange(tab.id as typeof activeTab)}
+            onClick={() => onTabChange(tab.id)}
             className={cn(
               "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-              activeTab === tab.id
-                ? "bg-white text-[#9d7443] shadow-sm"
-                : "text-stone-500 hover:text-stone-700"
+              activeTab === tab.id ? "bg-white text-[#9d7443] shadow-sm" : "text-stone-500 hover:text-stone-700"
             )}
           >
             {tab.label}
-            <span className="ml-1 text-xs opacity-60">({tabCounts[tab.id as keyof typeof tabCounts]})</span>
+            <span className="ml-1 text-xs opacity-60">({tabCounts[tab.id]})</span>
           </button>
         ))}
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
         <input
@@ -70,7 +68,6 @@ export function RequestFilters({
         />
       </div>
 
-      {/* Category filters */}
       <div>
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Category</p>
         <div className="flex flex-wrap gap-2">
@@ -82,9 +79,7 @@ export function RequestFilters({
                 onClick={() => onCategoryChange(cat.id)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-                  activeCategory === cat.id
-                    ? "bg-[#2f2a24] text-white"
-                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  activeCategory === cat.id ? "bg-[#2f2a24] text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 )}
               >
                 {Icon && <Icon className="h-3 w-3" />}

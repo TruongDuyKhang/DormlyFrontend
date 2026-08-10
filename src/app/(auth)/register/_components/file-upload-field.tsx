@@ -5,7 +5,7 @@ import { useState, useRef } from "react";
 import { Upload, FileText, CheckCircle, XCircle } from "lucide-react";
 import { MAX_FILE_SIZE, ACCEPTED_FILE_TYPES } from "./constants";
 import { formatFileSize } from "./utils";
-import type { FileWithPreview } from "./register-types";
+import { FileWithPreview } from "../types/register";
 
 interface FileUploadFieldProps {
   label: string;
@@ -15,7 +15,13 @@ interface FileUploadFieldProps {
   error?: string;
 }
 
-export function FileUploadField({ label, required, accept, onFileSelect, error }: FileUploadFieldProps) {
+export function FileUploadField({ 
+  label, 
+  required, 
+  accept, 
+  onFileSelect, 
+  error 
+}: FileUploadFieldProps) {
   const [file, setFile] = useState<FileWithPreview | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,6 +33,7 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
       return;
     }
 
+    // Kiểm tra loại file
     if (!ACCEPTED_FILE_TYPES.includes(selectedFile.type)) {
       setFile({
         file: selectedFile,
@@ -40,6 +47,7 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
       return;
     }
 
+    // Kiểm tra kích thước file
     if (selectedFile.size > MAX_FILE_SIZE) {
       setFile({
         file: selectedFile,
@@ -53,7 +61,10 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
       return;
     }
 
-    const preview = selectedFile.type.startsWith("image/") ? URL.createObjectURL(selectedFile) : "";
+    // Tạo preview cho image
+    const preview = selectedFile.type.startsWith("image/") 
+      ? URL.createObjectURL(selectedFile) 
+      : "";
 
     setFile({
       file: selectedFile,
@@ -95,6 +106,7 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
     }
   };
 
+  // Render component
   return (
     <div className="space-y-1">
       <label className="text-sm font-semibold text-stone-900">
@@ -128,12 +140,19 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
         </div>
       ) : (
         <div className={`rounded-2xl border p-4 ${
-          file.status === "error" ? "border-red-400 bg-red-50/30" : "border-emerald-200 bg-emerald-50/30"
+          file.status === "error" 
+            ? "border-red-400 bg-red-50/30" 
+            : "border-emerald-200 bg-emerald-50/30"
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {file.preview ? (
-                <img src={file.preview} alt="Preview" className="h-12 w-12 rounded-lg object-cover" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img 
+                  src={file.preview} 
+                  alt="Preview" 
+                  className="h-12 w-12 rounded-lg object-cover" 
+                />
               ) : (
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-stone-100">
                   <FileText className="h-6 w-6 text-stone-500" />
@@ -145,8 +164,12 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {file.status === "success" && <CheckCircle className="h-5 w-5 text-emerald-500" />}
-              {file.status === "error" && <XCircle className="h-5 w-5 text-red-500" />}
+              {file.status === "success" && (
+                <CheckCircle className="h-5 w-5 text-emerald-500" />
+              )}
+              {file.status === "error" && (
+                <XCircle className="h-5 w-5 text-red-500" />
+              )}
               <button
                 type="button"
                 onClick={removeFile}
@@ -156,10 +179,17 @@ export function FileUploadField({ label, required, accept, onFileSelect, error }
               </button>
             </div>
           </div>
-          {file.error && <p className="mt-2 text-xs text-red-500">{file.error}</p>}
+          {file.error && (
+            <p className="mt-2 text-xs text-red-500">{file.error}</p>
+          )}
         </div>
       )}
-      {error && !file && <p className="text-xs text-red-700">{error}</p>}
+      
+      {error && !file && (
+        <p className="text-xs text-red-700">{error}</p>
+      )}
     </div>
   );
 }
+
+export default FileUploadField;

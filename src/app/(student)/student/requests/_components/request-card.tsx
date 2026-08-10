@@ -1,34 +1,50 @@
-// app/(student)/requests/_components/request-card.tsx
 "use client";
 
-import { Calendar, Clock, MapPin, Wrench, MessageSquare, ArrowRight } from "lucide-react";
+import { Calendar, Wrench, Building2, Users, ShieldAlert, Receipt, HelpCircle, Flag } from "lucide-react";
 import { motion } from "framer-motion";
-import type { Request } from "./types";
+import type { TicketSummary } from "../types/ticket";
 
 interface RequestCardProps {
-  request: Request;
+  ticket: TicketSummary;
   onClick: () => void;
 }
 
-const statusConfig = {
-  pending: { label: "Pending Review", color: "bg-amber-500 text-white" },
-  assigned: { label: "Assigned", color: "bg-blue-600 text-white" },
-  in_progress: { label: "In Progress", color: "bg-sky-600 text-white" },
-  resolved: { label: "Resolved", color: "bg-emerald-600 text-white" },
-  rejected: { label: "Rejected", color: "bg-red-600 text-white" },
-  approved: { label: "Approved", color: "bg-emerald-600 text-white" },
+const statusConfig: Record<TicketSummary["status"], { label: string; color: string }> = {
+  OPEN: { label: "Open", color: "bg-amber-500 text-white" },
+  IN_PROGRESS: { label: "In Progress", color: "bg-sky-600 text-white" },
+  RESOLVED: { label: "Resolved", color: "bg-emerald-600 text-white" },
+  REJECTED: { label: "Rejected", color: "bg-red-600 text-white" },
+  CLOSED: { label: "Closed", color: "bg-stone-500 text-white" },
 };
 
-const categoryConfig = {
-  maintenance: { label: "Maintenance", icon: Wrench, color: "bg-sky-600 text-white" },
-  complaint: { label: "Complaint", icon: MessageSquare, color: "bg-amber-600 text-white" },
-  transfer: { label: "Transfer Request", icon: ArrowRight, color: "bg-emerald-600 text-white" },
+const priorityConfig: Record<TicketSummary["priority"], { label: string; color: string }> = {
+  LOW: { label: "Low", color: "text-stone-500" },
+  MEDIUM: { label: "Medium", color: "text-sky-600" },
+  HIGH: { label: "High", color: "text-amber-600" },
+  URGENT: { label: "Urgent", color: "text-red-600" },
 };
 
-export function RequestCard({ request, onClick }: RequestCardProps) {
-  const status = statusConfig[request.status];
-  const category = categoryConfig[request.category];
+const categoryConfig: Record<TicketSummary["category"], { label: string; icon: any; color: string }> = {
+  MAINTENANCE: { label: "Maintenance", icon: Wrench, color: "bg-sky-600 text-white" },
+  FACILITY: { label: "Facility", icon: Building2, color: "bg-teal-600 text-white" },
+  ROOMMATE: { label: "Roommate", icon: Users, color: "bg-amber-600 text-white" },
+  SECURITY: { label: "Security", icon: ShieldAlert, color: "bg-red-600 text-white" },
+  BILLING: { label: "Billing", icon: Receipt, color: "bg-violet-600 text-white" },
+  OTHER: { label: "Other", icon: HelpCircle, color: "bg-stone-500 text-white" },
+};
+
+function isOverdue(ticket: TicketSummary) {
+  if (!ticket.dueDate) return false;
+  const isOpenWork = ticket.status === "OPEN" || ticket.status === "IN_PROGRESS";
+  return isOpenWork && new Date(ticket.dueDate) < new Date(new Date().toDateString());
+}
+
+export function RequestCard({ ticket, onClick }: RequestCardProps) {
+  const status = statusConfig[ticket.status];
+  const category = categoryConfig[ticket.category];
+  const priority = priorityConfig[ticket.priority];
   const CategoryIcon = category.icon;
+  const overdue = isOverdue(ticket);
 
   return (
     <motion.article
@@ -48,34 +64,30 @@ export function RequestCard({ request, onClick }: RequestCardProps) {
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status.color}`}>
               {status.label}
             </span>
+            {overdue && (
+              <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                Overdue
+              </span>
+            )}
           </div>
           <h3 className="mt-2 font-semibold text-stone-900 group-hover:text-[#9d7443] transition">
-            {request.title}
+            {ticket.title}
           </h3>
-          <div className="mt-1 flex items-center gap-3 text-xs text-stone-500">
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {request.location}
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-stone-500 line-clamp-2">
-            {request.description}
-          </p>
+          <p className="mt-1 text-xs text-stone-400">{ticket.code}</p>
         </div>
+
         <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2 text-xs text-stone-400">
-            <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {new Date(request.createdAt).toLocaleDateString()}
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {request.updatedAt}
-            </span>
-          </div>
-          {request.attachments.length > 0 && (
+          <span className={`flex items-center gap-1 text-xs font-medium ${priority.color}`}>
+            <Flag className="h-3 w-3" />
+            {priority.label}
+          </span>
+          <span className="flex items-center gap-1 text-xs text-stone-400">
+            <Calendar className="h-3 w-3" />
+            {new Date(ticket.createdAt).toLocaleDateString()}
+          </span>
+          {ticket.assignees.length > 0 && (
             <span className="text-xs text-stone-400">
-              📎 {request.attachments.length} attachment(s)
+              {ticket.assignees.map((a) => a.fullName).join(", ")}
             </span>
           )}
         </div>

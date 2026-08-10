@@ -1,4 +1,3 @@
-// app/(student)/residence/documents/page.tsx
 "use client";
 
 import {
@@ -6,37 +5,30 @@ import {
   Eye,
   FileCheck2,
   FileText,
+  Loader2,
   RefreshCw,
   UploadCloud,
 } from "lucide-react";
 import { ResidenceTabs } from "../_components/residence-tabs";
 import { StatusBadge } from "../_components/status-badge";
+import { useDocuments } from "./hooks/useDocuments";
+import { useDocumentFile } from "./hooks/useDocumentFile";
 
-const documents = [
-  {
-    name: "Citizen ID",
-    status: "Uploaded",
-    verification: "Verified",
-    tone: "verified" as const,
-    updated: "12 Aug 2024",
-  },
-  {
-    name: "Temporary Residence Form",
-    status: "Uploaded",
-    verification: "Pending Review",
-    tone: "pending" as const,
-    updated: "01 Jun 2026",
-  },
-  {
-    name: "Student Card",
-    status: "Uploaded",
-    verification: "Verified",
-    tone: "verified" as const,
-    updated: "10 Aug 2024",
-  },
-];
+function formatDate(iso?: string) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function StudentDocumentsPage() {
+  const { documents, status, error, refetch } = useDocuments();
+  const { openFile, downloadFile, status: fileStatus } = useDocumentFile();
+  const isLoading = status === "idle" || status === "loading";
+  const isFileLoading = fileStatus === "loading";
+
   return (
     <div className="space-y-6 pb-24 lg:pb-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -48,15 +40,13 @@ export default function StudentDocumentsPage() {
             Documents
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-            Keep required residence files visible, verified, and easy to
-            update.
+            Keep required residence files visible, verified, and easy to update.
           </p>
         </div>
         <ResidenceTabs />
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(22rem,0.45fr)]">
-        {/* Left Column - Uploaded Documents */}
         <div className="rounded-[2rem] border border-white/60 bg-white/42 p-5 shadow-[0_34px_90px_-68px_rgba(38,35,31,0.7),inset_0_1px_0_rgba(255,255,255,0.78)] backdrop-blur-xl sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -68,59 +58,94 @@ export default function StudentDocumentsPage() {
                 Required files
               </h2>
             </div>
-            <button className="inline-flex h-11 items-center gap-2 rounded-full bg-[#2f2a24] px-5 text-sm font-medium text-stone-50 transition hover:bg-[#40382f] active:scale-[0.98]">
-              <UploadCloud className="h-4 w-4 text-[#d6bd8a]" />
-              Upload file
-            </button>
+        
           </div>
 
-          <div className="mt-7 space-y-3">
-            {documents.map((document) => (
-              <article
-                key={document.name}
-                className="rounded-[1.45rem] border border-stone-200/70 bg-[#f8f4ee]/76 p-4 transition hover:bg-white/72"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f2a24] text-[#d6bd8a]">
-                      <FileCheck2 className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-stone-900">
-                        {document.name}
-                      </h3>
-                      <p className="mt-1 text-sm text-stone-500">
-                        {document.status} on {document.updated}
-                      </p>
-                    </div>
-                  </div>
+          {isLoading && (
+            <div className="mt-10 flex items-center justify-center gap-2 text-sm text-stone-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading documents...
+            </div>
+          )}
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge tone={document.tone}>
-                      {document.verification}
-                    </StatusBadge>
-                    <button className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98]">
-                      <Eye className="h-3.5 w-3.5" />
-                      View
-                    </button>
-                    <button className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98]">
-                      <Download className="h-3.5 w-3.5" />
-                      Download
-                    </button>
-                    <button className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98]">
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Replace
-                    </button>
+          {status === "error" && (
+            <div className="mt-7 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              {error}
+              <button onClick={refetch} className="ml-3 font-medium underline underline-offset-2">
+                Try again
+              </button>
+            </div>
+          )}
+
+          {status === "success" && (
+            <div className="mt-7 space-y-3">
+              {documents.map((document) => (
+                <article
+                  key={document.documentType}
+                  className="rounded-[1.45rem] border border-stone-200/70 bg-[#f8f4ee]/76 p-4 transition hover:bg-white/72"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f2a24] text-[#d6bd8a]">
+                        <FileCheck2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-stone-900">{document.name}</h3>
+                        <p className="mt-1 text-sm text-stone-500">
+                          {document.uploaded
+                            ? `Uploaded on ${formatDate(document.updatedAt)}`
+                            : "Not uploaded yet"}
+                        </p>
+                        {document.status === "REJECTED" && document.rejectReason && (
+                          <p className="mt-1 text-xs text-rose-600">
+                            Reason: {document.rejectReason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge tone={document.tone}>
+                        {document.verificationLabel}
+                      </StatusBadge>
+                      {document.uploaded && document.fileUrl && (
+                        <>
+                          <button
+                            disabled={isFileLoading}
+                            onClick={() => openFile(document.fileUrl!)}
+                            className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98] disabled:opacity-50"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </button>
+                          <button
+                            disabled={isFileLoading}
+                            onClick={() =>
+                              downloadFile(
+                                document.fileUrl!,
+                                `${document.name}${document.fileUrl!.slice(document.fileUrl!.lastIndexOf("."))}`
+                              )
+                            }
+                            className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98] disabled:opacity-50"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Download
+                          </button>
+                        </>
+                      )}
+                      <button className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98]">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        {document.uploaded ? "Replace" : "Upload"}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Right Column - Sidebar */}
         <aside className="space-y-6">
-          {/* Verification Status - Màu tối */}
           <div className="rounded-[1.75rem] border border-white/60 bg-[#2f2a24]/92 p-5 text-stone-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-xl sm:p-6">
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-stone-400">
               Verification Status
@@ -128,21 +153,18 @@ export default function StudentDocumentsPage() {
             <div className="mt-6 space-y-3">
               {documents.map((document) => (
                 <div
-                  key={document.name}
+                  key={document.documentType}
                   className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/7 p-4"
                 >
-                  <p className="text-sm font-medium text-stone-100">
-                    {document.name}
-                  </p>
+                  <p className="text-sm font-medium text-stone-100">{document.name}</p>
                   <StatusBadge tone={document.tone}>
-                    {document.verification}
+                    {document.verificationLabel}
                   </StatusBadge>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Document Guidelines - Giữ nguyên màu và khung của Re-upload Request cũ, không dùng icon */}
           <div className="rounded-[1.75rem] border border-[#2f2a24]/10 bg-[#d9cbb8] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.42)] sm:p-6">
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-stone-600">
               Document Guidelines
