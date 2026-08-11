@@ -1,4 +1,4 @@
-// app/(platform)/settings/structure/_components/types.ts
+// app/(platform)/platform/settings/structure/_components/types.ts
 
 export interface Block {
   id: string;
@@ -40,7 +40,19 @@ export interface RoomType {
   updatedAt: string;
 }
 
-// NEW: Room interface
+export interface RoomOccupant {
+  assignmentId: string;
+  userId: string;
+  name: string;
+  email: string;
+  studentCode?: string;
+  major?: string;
+  phone?: string;
+  startDate?: string;
+  endDate?: string;
+  status: string;
+}
+
 export interface Room {
   id: string;
   roomNumber: string;
@@ -54,6 +66,7 @@ export interface Room {
   currentOccupants: number;
   status: 'available' | 'occupied' | 'maintenance' | 'reserved';
   genderRestriction: 'all' | 'male' | 'female';
+  occupants?: RoomOccupant[];
   createdAt: string;
   updatedAt: string;
 }

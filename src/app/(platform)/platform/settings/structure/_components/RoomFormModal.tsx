@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, DoorClosed, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Room, Floor, RoomType, Block } from './types';
-import { blocks, floors, roomTypes } from './mockData';
 
 // Custom Dropdown Component
 interface DropdownOption {
@@ -29,7 +28,7 @@ function CustomDropdown({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find((opt) => opt.value === value);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -85,13 +84,26 @@ function CustomDropdown({
 interface RoomFormModalProps {
   isOpen: boolean;
   room: Room | null;
-  onClose: () => void;
-  onSave: (data: Partial<Room>) => void;
+  blocks?: Block[];
+  floors?: Floor[];
+  roomTypes?: RoomType[];
   selectedBlockId?: string;
   selectedFloorId?: string;
+  onClose: () => void;
+  onSave: (data: Partial<Room>) => void;
 }
 
-export function RoomFormModal({ isOpen, room, onClose, onSave, selectedBlockId, selectedFloorId }: RoomFormModalProps) {
+export function RoomFormModal({ 
+  isOpen, 
+  room, 
+  blocks = [], 
+  floors = [], 
+  roomTypes = [], 
+  selectedBlockId, 
+  selectedFloorId, 
+  onClose, 
+  onSave 
+}: RoomFormModalProps) {
   const [formData, setFormData] = useState({
     roomNumber: '',
     blockId: '',
@@ -114,68 +126,60 @@ export function RoomFormModal({ isOpen, room, onClose, onSave, selectedBlockId, 
         currentOccupants: room.currentOccupants,
       });
     } else {
+      const defaultBlockId = selectedBlockId || blocks[0]?.id || '';
+      const availableFloors = floors.filter((f) => f.blockId === defaultBlockId);
+      const defaultFloorId = selectedFloorId || availableFloors[0]?.id || '';
+      const defaultRoomTypeId = roomTypes[0]?.id || '';
+      
       setFormData({
         roomNumber: '',
-        blockId: selectedBlockId || (blocks.length > 0 ? blocks[0].id : ''),
-        floorId: selectedFloorId || '',
-        roomTypeId: roomTypes.length > 0 ? roomTypes[0].id : '',
+        blockId: defaultBlockId,
+        floorId: defaultFloorId,
+        roomTypeId: defaultRoomTypeId,
         capacity: 4,
         genderRestriction: 'all',
         currentOccupants: 0,
       });
     }
-  }, [room, isOpen, selectedBlockId, selectedFloorId]);
+  }, [room, selectedBlockId, selectedFloorId, blocks, floors, roomTypes, isOpen]);
 
-  // Get floors for selected block
-  const availableFloors = floors.filter(f => f.blockId === formData.blockId);
-  
-  // Get selected room type
-  const selectedRoomType = roomTypes.find(rt => rt.id === formData.roomTypeId);
-  
-  // Update capacity when room type changes
-  useEffect(() => {
-    if (selectedRoomType) {
-      setFormData(prev => ({
-        ...prev,
-        capacity: selectedRoomType.capacity,
-        genderRestriction: selectedRoomType.genderRestriction,
-      }));
-    }
-  }, [formData.roomTypeId]);
+  // Filter floors based on selected block
+  const availableFloors = floors.filter((f) => f.blockId === formData.blockId);
+
+  const handleBlockChange = (blockId: string) => {
+    const blockFloors = floors.filter((f) => f.blockId === blockId);
+    setFormData({
+      ...formData,
+      blockId,
+      floorId: blockFloors[0]?.id || '',
+    });
+  };
+
+  const handleRoomTypeChange = (roomTypeId: string) => {
+    const selectedType = roomTypes.find((rt) => rt.id === roomTypeId);
+    setFormData({
+      ...formData,
+      roomTypeId,
+      capacity: selectedType?.capacity || 4,
+      genderRestriction: selectedType?.genderRestriction || 'all',
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const block = blocks.find(b => b.id === formData.blockId);
-    const floor = floors.find(f => f.id === formData.floorId);
-    const roomType = roomTypes.find(rt => rt.id === formData.roomTypeId);
-    
+    const selectedBlock = blocks.find((b) => b.id === formData.blockId);
+    const selectedFloor = floors.find((f) => f.id === formData.floorId);
+    const selectedType = roomTypes.find((rt) => rt.id === formData.roomTypeId);
+
     onSave({
       ...formData,
-      blockName: block?.name || '',
-      floorLevel: floor?.level || 0,
-      roomTypeName: roomType?.name || '',
-      status: 'available' as const,
+      blockName: selectedBlock?.name || '',
+      floorLevel: selectedFloor?.level || 1,
+      roomTypeName: selectedType?.name || 'Standard Room',
+      status: 'available',
     });
     onClose();
   };
-
-  // Options
-  const blockOptions: DropdownOption[] = blocks
-    .filter(b => b.status === 'active')
-    .map(b => ({ value: b.id, label: `${b.name} (${b.code})` }));
-
-  const floorOptions: DropdownOption[] = availableFloors
-    .map(f => ({ value: f.id, label: `Floor ${f.level}${f.description ? ` - ${f.description}` : ''}` }));
-
-  const roomTypeOptions: DropdownOption[] = roomTypes
-    .filter(rt => rt.isActive)
-    .map(rt => ({ value: rt.id, label: `${rt.name} (${rt.capacity} beds)` }));
-
-  const genderOptions: DropdownOption[] = [
-    { value: 'all', label: 'All Genders' },
-    { value: 'male', label: 'Male Only' },
-    { value: 'female', label: 'Female Only' },
-  ];
 
   return (
     <AnimatePresence>
@@ -184,130 +188,144 @@ export function RoomFormModal({ isOpen, room, onClose, onSave, selectedBlockId, 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-sm"
-          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
         >
           <motion.div
-            initial={{ scale: 0.95, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: 20 }}
-            className="relative w-full max-w-2xl rounded-2xl border border-white/60 bg-[#f3eee6] shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="w-full max-w-lg rounded-3xl border border-white/60 bg-white/95 p-6 shadow-2xl backdrop-blur-xl"
           >
-            <div className="bg-gradient-to-r from-[#c3a26c]/20 to-[#c3a26c]/5 px-6 py-4 border-b border-white/40">
-              <button onClick={onClose} className="absolute right-4 top-4 rounded-full p-1.5 text-stone-500 hover:bg-white/50 transition">
-                <X className="h-5 w-5" />
-              </button>
+            <div className="flex items-center justify-between pb-4 border-b border-stone-200">
               <div className="flex items-center gap-3">
-                <DoorClosed className="h-5 w-5 text-[#c3a26c]" />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-950">
-                  {room ? 'Edit Room' : 'Add New Room'}
-                </h2>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#c3a26c]/10 text-[#c3a26c]">
+                  <DoorClosed className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-stone-800">
+                    {room ? 'Edit Room' : 'Add New Room'}
+                  </h3>
+                  <p className="text-xs text-stone-500">Configure room specifications</p>
+                </div>
               </div>
-              <p className="text-sm text-stone-500 mt-1">
-                {room ? 'Update room information' : 'Add a new room to the residence'}
-              </p>
+              <button
+                onClick={onClose}
+                className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <div className="p-6 max-h-[calc(90vh-120px)] overflow-y-auto">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-stone-700 block mb-1">Room Number *</label>
-                    <input
-                      type="text"
-                      value={formData.roomNumber}
-                      onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value.toUpperCase() })}
-                      placeholder="e.g., A101"
-                      className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-stone-700 block mb-1">Block *</label>
-                    <CustomDropdown
-                      value={formData.blockId}
-                      onChange={(value) => setFormData({ ...formData, blockId: value, floorId: '' })}
-                      options={blockOptions}
-                      placeholder="Select block"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-stone-700 block mb-1">Floor *</label>
-                    <CustomDropdown
-                      value={formData.floorId}
-                      onChange={(value) => setFormData({ ...formData, floorId: value })}
-                      options={floorOptions}
-                      placeholder={availableFloors.length > 0 ? "Select floor" : "No floors available"}
-                      disabled={availableFloors.length === 0}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-stone-700 block mb-1">Room Type *</label>
-                    <CustomDropdown
-                      value={formData.roomTypeId}
-                      onChange={(value) => setFormData({ ...formData, roomTypeId: value })}
-                      options={roomTypeOptions}
-                      placeholder="Select room type"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-stone-700 block mb-1">Gender Restriction</label>
-                    <CustomDropdown
-                      value={formData.genderRestriction}
-                      onChange={(value) => setFormData({ ...formData, genderRestriction: value as any })}
-                      options={genderOptions}
-                      placeholder="Select gender"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-stone-700 block mb-1">Capacity</label>
-                    <input
-                      type="number"
-                      value={formData.capacity}
-                      className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-500 cursor-not-allowed"
-                      disabled
-                    />
-                    <p className="text-xs text-stone-400 mt-1">Auto-set from room type</p>
-                  </div>
-                </div>
-
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {/* Block & Floor */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-stone-700 block mb-1">Current Occupants</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={formData.capacity}
-                    value={formData.currentOccupants}
-                    onChange={(e) => setFormData({ ...formData, currentOccupants: parseInt(e.target.value) })}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Block
+                  </label>
+                  <CustomDropdown
+                    value={formData.blockId}
+                    onChange={handleBlockChange}
+                    options={blocks.map((b) => ({ value: b.id, label: b.name }))}
+                    placeholder="Select Block"
                   />
                 </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-xl bg-[#c3a26c] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#b08f5a] transition flex items-center justify-center gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    {room ? 'Save Changes' : 'Create Room'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex-1 rounded-xl border border-stone-300 bg-white/50 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-white transition"
-                  >
-                    Cancel
-                  </button>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Floor
+                  </label>
+                  <CustomDropdown
+                    value={formData.floorId}
+                    onChange={(val) => setFormData({ ...formData, floorId: val })}
+                    options={availableFloors.map((f) => ({ value: f.id, label: `Floor ${f.level}` }))}
+                    placeholder="Select Floor"
+                    disabled={!formData.blockId}
+                  />
                 </div>
-              </form>
-            </div>
+              </div>
+
+              {/* Room Number */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Room Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.roomNumber}
+                  onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+                  placeholder="e.g. A101"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-700 focus:border-[#c3a26c] focus:outline-none"
+                />
+              </div>
+
+              {/* Room Type */}
+              {roomTypes.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Room Type
+                  </label>
+                  <CustomDropdown
+                    value={formData.roomTypeId}
+                    onChange={handleRoomTypeChange}
+                    options={roomTypes.map((rt) => ({
+                      value: rt.id,
+                      label: `${rt.name} (${rt.capacity} beds)`,
+                    }))}
+                    placeholder="Select Room Type"
+                  />
+                </div>
+              )}
+
+              {/* Capacity & Gender */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Max Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    value={formData.capacity}
+                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 1 })}
+                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-700 focus:border-[#c3a26c] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Gender Policy
+                  </label>
+                  <select
+                    value={formData.genderRestriction}
+                    onChange={(e) => setFormData({ ...formData, genderRestriction: e.target.value as any })}
+                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-700 focus:border-[#c3a26c] focus:outline-none"
+                  >
+                    <option value="all">All Genders</option>
+                    <option value="male">Male Only</option>
+                    <option value="female">Female Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-xl bg-[#c3a26c] px-5 py-2 text-sm font-semibold text-white hover:bg-[#b08f5a] transition shadow-sm"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Room
+                </button>
+              </div>
+            </form>
           </motion.div>
         </motion.div>
       )}

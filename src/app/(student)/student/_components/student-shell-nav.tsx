@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Bell,
   Bot,
@@ -35,12 +35,12 @@ import {
 } from "@/_components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/_components/ui/avatar";
 import { Button } from "@/_components/ui/button";
+import { useAuth } from "@/app/(auth)/context/auth-context";
 
 const items = [
   { label: "Home", href: "/student/home", icon: Home },
   { label: "Residence", href: "/student/residence/room", icon: Sparkles },
   { label: "Requests", href: "/student/requests", icon: Bell },
-  // { label: "Community", href: "/student/community/feed", icon: MessageCircle },
   { label: "Chat", href: "/student/chat", icon: Bot },
   { label: "Profile", href: "/student/profile/account", icon: User },
 ];
@@ -48,6 +48,31 @@ const items = [
 export function StudentShellNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const [studentInfo, setStudentInfo] = useState({
+    name: "Student Resident",
+    email: "student@dormly.edu",
+    initials: "ST",
+  });
+
+  useEffect(() => {
+    if (user) {
+      const name = user.fullname || user.email?.split("@")[0] || "Student";
+      const initials = name
+        .split(" ")
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "ST";
+      setStudentInfo({
+        name,
+        email: user.email || "student@dormly.edu",
+        initials,
+      });
+    }
+  }, [user]);
 
   const isActive = (label: string, href: string) => {
     if (label === "Residence") {
@@ -57,19 +82,6 @@ export function StudentShellNav() {
       );
     }
     return pathname === href || pathname?.startsWith(`${href}/`);
-  };
-
-  const handleLanguageChange = (langCode: string) => {
-    console.log("Language changed to:", langCode);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("dormly_language");
-    localStorage.removeItem("dormly_profile");
-    localStorage.removeItem("dormly_auth_token");
-    localStorage.removeItem("dormly_user");
-    sessionStorage.clear();
-    router.push("/login");
   };
 
   const handleProfile = () => {
@@ -84,7 +96,7 @@ export function StudentShellNav() {
     <>
       {/* Desktop Header */}
       <div className="hidden lg:flex items-center justify-between w-full">
-        {/* Logo bên trái */}
+        {/* Logo */}
         <Link
           href="/student/home"
           className="flex items-center gap-3 flex-shrink-0"
@@ -109,7 +121,7 @@ export function StudentShellNav() {
           </div>
         </Link>
 
-        {/* Navigation Menu - ở giữa màn hình */}
+        {/* Navigation Menu */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/60 bg-white/32 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] backdrop-blur-xl">
           {items.map((item) => {
             const active = isActive(item.label, item.href);
@@ -120,123 +132,103 @@ export function StudentShellNav() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition duration-300 active:scale-[0.98]",
+                  "relative flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition",
                   active
-                    ? "bg-[#2f2a24] text-stone-50 shadow-[0_12px_28px_-18px_rgba(47,42,36,0.8)]"
-                    : "text-stone-600 hover:bg-white/50 hover:text-stone-900",
+                    ? "bg-[#2f2a24] text-[#d6bd8a] shadow-[0_12px_28px_-16px_rgba(47,42,36,0.85)]"
+                    : "text-stone-600 hover:bg-white/45 hover:text-stone-900",
                 )}
               >
-                <Icon
-                  className={cn(
-                    "h-4 w-4",
-                    active ? "text-[#d6bd8a]" : "text-stone-500",
-                  )}
-                />
-                {item.label}
+                <Icon className="h-3.5 w-3.5" />
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Bên phải - Emergency Contact + Notifications + Language Switcher + Avatar */}
+        {/* Right Section: Language Switcher, Support & Profile */}
         <div className="flex items-center gap-2">
-          {/* Emergency Contact Button - Added here */}
+          {/* Language Switcher */}
+          <LanguageSwitcher variant="compact" />
+
+          {/* Support Popover */}
           <Popover>
             <PopoverTrigger asChild>
-              <button
-                aria-label="Emergency contact"
-                className="relative flex h-9 items-center gap-1.5 rounded-full border-2 border-red-400/80 bg-red-500/90 px-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition hover:bg-red-600/90 hover:border-red-500 active:scale-[0.98]"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full border border-white/60 bg-white/32 text-stone-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] hover:bg-white/55"
               >
-                <AlertCircle className="h-3.5 w-3.5 text-white" />
-                <span className="text-xs font-semibold hidden xl:inline tracking-wide">
-                  Emergency
-                </span>
-              </button>
+                <AlertCircle className="h-4 w-4" />
+              </Button>
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-72 border-red-200/60 bg-[#f3eee6]/95 p-4 text-stone-800 shadow-2xl backdrop-blur-xl"
+              className="w-80 border-white/60 bg-[#f3eee6]/95 p-4 text-stone-800 shadow-2xl backdrop-blur-xl"
             >
-              <div className="flex items-center gap-2.5 border-b-2 border-red-200 pb-2.5 mb-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-stone-900">
-                    Emergency Contact
+              <div className="space-y-3">
+                <div className="border-b border-stone-200/80 pb-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+                    Emergency & Support
                   </p>
-                  <p className="text-xs text-stone-500">Available 24/7</p>
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                {/* Phone */}
-                <a
-                  href="tel:+842742222230"
-                  className="flex items-center gap-2.5 rounded-lg p-2.5 transition hover:bg-white/60 group border border-transparent hover:border-red-200"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 group-hover:bg-red-200 group-hover:scale-105 transition-transform">
-                    <Phone className="h-4.5 w-4.5" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-stone-900">
-                      Phone
-                    </p>
-                    <p className="text-xs text-stone-600 font-medium">
-                      0274 2222 230
-                    </p>
-                  </div>
-                </a>
-
-                {/* Email */}
-                <a
-                  href="mailto:Housing@eiu.edu.vn"
-                  className="flex items-center gap-2.5 rounded-lg p-2.5 transition hover:bg-white/60 group border border-transparent hover:border-blue-200"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 group-hover:bg-blue-200 group-hover:scale-105 transition-transform">
-                    <Mail className="h-4.5 w-4.5" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-stone-900">
-                      Email
-                    </p>
-                    <p className="text-xs text-stone-600 font-medium truncate">
-                      Housing@eiu.edu.vn
-                    </p>
-                  </div>
-                </a>
-
-                <div className="mt-2.5 rounded-lg bg-red-50/80 p-2.5 border-2 border-red-200/60">
-                  <p className="text-xs text-stone-700 leading-relaxed">
-                    <span className="font-semibold text-red-700">
-                    For emergencies:
-                    </span>{" "}
-                    Contact security or residence staff immediately.
+                  <p className="text-sm font-semibold text-stone-800">
+                    Dormitory Hotlines
                   </p>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between rounded-xl bg-white/40 p-2.5">
+                    <span className="font-medium text-stone-600">
+                      Security Desk
+                    </span>
+                    <a
+                      href="tel:0901234567"
+                      className="flex items-center gap-1 font-semibold text-[#c3a26c] hover:underline"
+                    >
+                      <Phone className="h-3 w-3" /> 0901 234 567
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-white/40 p-2.5">
+                    <span className="font-medium text-stone-600">
+                      Medical Support
+                    </span>
+                    <a
+                      href="tel:0901234568"
+                      className="flex items-center gap-1 font-semibold text-[#c3a26c] hover:underline"
+                    >
+                      <Phone className="h-3 w-3" /> 0901 234 568
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-white/40 p-2.5">
+                    <span className="font-medium text-stone-600">
+                      Admin Email
+                    </span>
+                    <a
+                      href="mailto:support@dormly.edu"
+                      className="flex items-center gap-1 font-semibold text-[#c3a26c] hover:underline"
+                    >
+                      <Mail className="h-3 w-3" /> support@dormly.edu
+                    </a>
+                  </div>
                 </div>
               </div>
             </PopoverContent>
           </Popover>
 
-          {/* Language Switcher */}
-          <LanguageSwitcher
-            variant="header"
-            onLanguageChange={handleLanguageChange}
-          />
-
-          {/* Avatar Dropdown */}
+          {/* User Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-10 w-10 rounded-full border border-white/60 bg-white/38 p-0 hover:bg-white/60"
+                className="h-10 gap-2 rounded-full border border-white/60 bg-white/32 px-2 pr-3 text-stone-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] hover:bg-white/55"
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/avatar.png" alt="Avatar" />
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(studentInfo.name)}&background=2f2a24&color=d6bd8a&size=64`} alt={studentInfo.name} />
                   <AvatarFallback className="bg-[#2f2a24] text-xs font-semibold text-[#d6bd8a]">
-                    DK
+                    {studentInfo.initials}
                   </AvatarFallback>
                 </Avatar>
+                <span className="text-xs font-semibold text-stone-800">
+                  {studentInfo.name.split(" ")[0]}
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -246,14 +238,14 @@ export function StudentShellNav() {
               <DropdownMenuLabel className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-[#2f2a24] text-xs font-semibold text-[#d6bd8a]">
-                    DK
+                    {studentInfo.initials}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <p className="text-sm font-semibold text-stone-800">
-                    Trương Duy Khang
+                <div className="truncate">
+                  <p className="text-sm font-semibold text-stone-800 truncate">
+                    {studentInfo.name}
                   </p>
-                  <p className="text-xs text-stone-500">Student</p>
+                  <p className="text-xs text-stone-500 truncate">{studentInfo.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -274,7 +266,7 @@ export function StudentShellNav() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer gap-2 text-red-600 focus:text-red-600"
-                onClick={handleLogout}
+                onClick={() => logout()}
               >
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>
@@ -285,7 +277,7 @@ export function StudentShellNav() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 rounded-[1.5rem] border border-white/60 bg-[#f7f2ea]/86 p-1.5 shadow-[0_24px_60px_-38px_rgba(38,35,31,0.75),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl lg:hidden">
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-[1.5rem] border border-white/60 bg-[#f7f2ea]/86 p-1.5 shadow-[0_24px_60px_-38px_rgba(38,35,31,0.75),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl lg:hidden">
         {items.map((item) => {
           const active = isActive(item.label, item.href);
           const Icon = item.icon;

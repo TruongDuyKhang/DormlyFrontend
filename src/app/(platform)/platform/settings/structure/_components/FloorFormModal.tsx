@@ -6,17 +6,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Floor, Block } from './types';
-import { blocks } from './mockData';
 
 interface FloorFormModalProps {
   isOpen: boolean;
   floor: Floor | null;
   selectedBlock: Block | null;
+  blocks?: Block[];
   onClose: () => void;
   onSave: (data: { blockId: string; level: number; description: string }) => void;
 }
 
-export function FloorFormModal({ isOpen, floor, selectedBlock, onClose, onSave }: FloorFormModalProps) {
+export function FloorFormModal({ isOpen, floor, selectedBlock, blocks = [], onClose, onSave }: FloorFormModalProps) {
   const [formData, setFormData] = useState({
     blockId: '',
     level: 1,
@@ -43,9 +43,9 @@ export function FloorFormModal({ isOpen, floor, selectedBlock, onClose, onSave }
         description: '',
       });
     }
-  }, [floor, selectedBlock, isOpen]);
+  }, [floor, selectedBlock, blocks, isOpen]);
 
-  const selectedBlockObj = blocks.find(b => b.id === formData.blockId);
+  const selectedBlockObj = blocks.find((b) => b.id === formData.blockId) || selectedBlock;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,96 +60,99 @@ export function FloorFormModal({ isOpen, floor, selectedBlock, onClose, onSave }
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-sm"
-          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
         >
           <motion.div
-            initial={{ scale: 0.95, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg rounded-2xl border border-white/60 bg-[#f3eee6] shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="w-full max-w-lg rounded-3xl border border-white/60 bg-white/95 p-6 shadow-2xl backdrop-blur-xl"
           >
-            <div className="bg-gradient-to-r from-[#c3a26c]/20 to-[#c3a26c]/5 px-6 py-4 border-b border-white/40">
-              <button onClick={onClose} className="absolute right-4 top-4 rounded-full p-1.5 text-stone-500 hover:bg-white/50 transition">
-                <X className="h-5 w-5" />
-              </button>
+            <div className="flex items-center justify-between pb-4 border-b border-stone-200">
               <div className="flex items-center gap-3">
-                <Layers className="h-5 w-5 text-[#c3a26c]" />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-950">
-                  {floor ? 'Edit Floor' : 'Add New Floor'}
-                </h2>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#c3a26c]/10 text-[#c3a26c]">
+                  <Layers className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-stone-800">
+                    {floor ? 'Edit Floor' : 'Add New Floor'}
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Configure floor details for {selectedBlockObj?.name || 'Building'}
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-stone-500 mt-1">
-                {floor ? 'Update floor information' : 'Add a new floor to a block'}
-              </p>
+              <button
+                onClick={onClose}
+                className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {/* Block Selection if multiple available */}
+              {blocks.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                    Residence Block
+                  </label>
+                  <select
+                    value={formData.blockId}
+                    onChange={(e) => setFormData({ ...formData, blockId: e.target.value })}
+                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-700 focus:border-[#c3a26c] focus:outline-none"
+                  >
+                    {blocks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
-                <label className="text-sm font-medium text-stone-700 block mb-1">Block *</label>
-                <select
-                  value={formData.blockId}
-                  onChange={(e) => setFormData({ ...formData, blockId: e.target.value })}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Floor Level
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
                   required
-                  disabled={!!selectedBlock}
-                >
-                  {blocks.map(b => (
-                    <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-stone-700 block mb-1">Floor Level *</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) })}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-stone-700 block mb-1">Room Count</label>
-                  <input
-                    type="text"
-                    value={floor ? `${floor.roomCount} rooms` : 'Will be auto-calculated'}
-                    disabled
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-500 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-stone-700 block mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={2}
-                  placeholder="e.g., Ground floor, Main entrance..."
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30 resize-none"
+                  value={formData.level}
+                  onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) || 1 })}
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-700 focus:border-[#c3a26c] focus:outline-none"
                 />
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 rounded-xl bg-[#c3a26c] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#b08f5a] transition flex items-center justify-center gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  {floor ? 'Save Changes' : 'Create Floor'}
-                </button>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="e.g. Standard floor with study lounge and laundry facilities"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-700 focus:border-[#c3a26c] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-200">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 rounded-xl border border-stone-300 bg-white/50 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-white transition"
+                  className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 transition"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-xl bg-[#c3a26c] px-5 py-2 text-sm font-semibold text-white hover:bg-[#b08f5a] transition shadow-sm"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Floor
                 </button>
               </div>
             </form>

@@ -1,12 +1,13 @@
 // app/(platform)/communication/notifications/_components/SentNotificationsTab.tsx
 'use client';
 
-import { useState } from 'react';
-import { Eye, Copy, Trash2, Search, Mail, Bell, Users, Building2, Layers, DoorOpen, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Eye, Copy, Trash2, Search, Mail, Bell, Users, Building2, Layers, DoorOpen, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PriorityBadge } from './PriorityBadge';
 import { Notification } from './types';
-import { sentNotifications } from './mockData';
+import { notificationService } from '@/services/notificationService';
+import type { NotificationLog } from '@/types/models';
 
 interface SentNotificationsTabProps {
   onDuplicate?: (notification: Notification) => void;
@@ -15,277 +16,182 @@ interface SentNotificationsTabProps {
 
 const ITEMS_PER_PAGE = 10;
 
+function mapLogToNotification(log: NotificationLog): Notification {
+  return {
+    id: log.id || log.eventId,
+    title: log.subject || 'Announcement',
+    message: log.subject || '',
+    priority: 'normal',
+    audience: {
+      type: 'all',
+    },
+    delivery: log.channel === 'EMAIL' ? 'email' : 'inapp',
+    status: log.status === 'SENT' ? 'sent' : 'draft',
+    sentAt: log.createdAt,
+    scheduledAt: null,
+    createdAt: log.createdAt,
+    createdBy: log.recipient || 'Admin',
+  };
+}
+
 export function SentNotificationsTab({ onDuplicate, onUseTemplate }: SentNotificationsTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [localSearch, setLocalSearch] = useState('');
-  const [notifications, setNotifications] = useState(sentNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  
+
+  const loadLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await notificationService.getLogs({ size: 50 });
+      if (res && res.content) {
+        const mapped = res.content.map(mapLogToNotification);
+        setNotifications(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load notification logs:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
   const handleSearch = () => {
     setSearchQuery(localSearch);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
-  
+
   const handleClearSearch = () => {
     setLocalSearch('');
     setSearchQuery('');
     setCurrentPage(1);
   };
-  
-  // Filter notifications based on search
-  const filteredNotifications = notifications.filter(n =>
+
+  const filteredNotifications = notifications.filter((n) =>
     n.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
-  // Pagination
-  const totalPages = Math.ceil(filteredNotifications.length / ITEMS_PER_PAGE);
+
+  const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedNotifications = filteredNotifications.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // Scroll to top of list
     document.getElementById('notifications-list-top')?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
-  
-  const getAudienceIcon = (audience: Notification['audience']) => {
-    switch (audience.type) {
-      case 'all': return <Users className="h-3.5 w-3.5" />;
-      case 'block': return <Building2 className="h-3.5 w-3.5" />;
-      case 'floor': return <Layers className="h-3.5 w-3.5" />;
-      case 'room': return <DoorOpen className="h-3.5 w-3.5" />;
-    }
-  };
-  
-  const getAudienceText = (audience: Notification['audience']) => {
-    switch (audience.type) {
-      case 'all': return 'All Residents';
-      case 'block': return `Block ${audience.value?.toUpperCase()}`;
-      case 'floor': {
-        const [block, floor] = (audience.value || '').split('-');
-        return `Block ${block?.toUpperCase()} • Floor ${floor}`;
-      }
-      case 'room': {
-        const [block, floor, room] = (audience.value || '').split('-');
-        return `Block ${block?.toUpperCase()} • Floor ${floor} • Room ${room}`;
-      }
-      default: return 'Unknown';
-    }
-  };
-  
-  const getDeliveryIcon = (delivery: string) => {
-    if (delivery === 'inapp') return <Bell className="h-3.5 w-3.5" />;
-    if (delivery === 'email') return <Mail className="h-3.5 w-3.5" />;
-    return (
-      <div className="flex items-center gap-0.5">
-        <Bell className="h-3 w-3" />
-        <Mail className="h-3 w-3" />
-      </div>
-    );
-  };
-  
-  const handleDuplicate = (notification: Notification) => {
-    if (onDuplicate) {
-      onDuplicate(notification);
-    } else {
-      console.log('Duplicate', notification);
-    }
-  };
-  
-  const handleView = (notification: Notification) => {
-    console.log('View', notification);
-  };
-  
-  const handleDelete = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-  
+
   return (
-    <div id="notifications-list-top" className="space-y-4">
-      {/* Search with Button */}
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+    <div className="space-y-4">
+      {/* Search Bar */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
           <input
             type="text"
+            placeholder="Search sent notifications..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search notifications..."
-            className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-9 pr-3 text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="w-full rounded-xl border border-white/60 bg-white/40 pl-9 pr-9 py-2 text-sm backdrop-blur-sm focus:border-[#c3a26c] focus:outline-none"
           />
+          {localSearch && (
+            <button onClick={handleClearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <button
           onClick={handleSearch}
-          className="rounded-xl bg-[#c3a26c] px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#b08f5a] transition flex items-center gap-2"
+          className="rounded-xl bg-[#c3a26c] px-4 py-2 text-sm font-medium text-white hover:bg-[#b08f5a] transition"
         >
-          <Search className="h-4 w-4" />
           Search
         </button>
-        {searchQuery && (
-          <button
-            onClick={handleClearSearch}
-            className="rounded-xl border border-stone-300 bg-white px-5 py-2.5 text-sm text-stone-600 hover:bg-stone-50 transition flex items-center gap-2"
-          >
-            <X className="h-4 w-4" />
-            Clear
-          </button>
-        )}
       </div>
-      
-      {/* Results count */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-stone-500">
-          Showing {paginatedNotifications.length} of {filteredNotifications.length} notifications
-        </p>
-      </div>
-      
-      {/* Notifications List */}
-      <div className="space-y-3">
-        {paginatedNotifications.map((notification) => (
-          <div
-            key={notification.id}
-            className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <h4 className="text-sm font-semibold text-stone-900">{notification.title}</h4>
-                  <PriorityBadge priority={notification.priority} size="sm" />
-                  <div className="flex items-center gap-1 text-xs text-stone-400">
-                    {getDeliveryIcon(notification.delivery)}
-                  </div>
-                </div>
-                <p className="text-sm text-stone-600 mb-3 line-clamp-2">{notification.message}</p>
-                <div className="flex items-center gap-4 text-xs text-stone-500">
-                  <div className="flex items-center gap-1">
-                    {getAudienceIcon(notification.audience)}
-                    <span>{getAudienceText(notification.audience)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>Sent by {notification.createdBy}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>{formatDate(notification.sentAt!)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 ml-4">
-                <button
-                  onClick={() => handleView(notification)}
-                  className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition"
-                  title="View"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDuplicate(notification)}
-                  className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition"
-                  title="Duplicate"
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(notification.id)}
-                  className="rounded-lg p-2 text-stone-400 hover:bg-red-50 hover:text-red-600 transition"
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {filteredNotifications.length === 0 && (
-        <div className="py-12 text-center text-stone-500">
-          {searchQuery ? 'No notifications match your search' : 'No sent notifications found'}
+
+      {isLoading && (
+        <div className="flex items-center gap-2 text-xs text-stone-500 py-4">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading logs from message queue...
         </div>
       )}
-      
+
+      {/* Notifications Table */}
+      <div id="notifications-list-top" className="overflow-hidden rounded-2xl border border-white/60 bg-white/30 backdrop-blur-sm">
+        <table className="w-full text-left text-sm text-stone-700">
+          <thead className="border-b border-white/40 bg-white/40 text-xs font-semibold uppercase tracking-wider text-stone-500">
+            <tr>
+              <th className="px-5 py-3">Subject & Recipient</th>
+              <th className="px-5 py-3">Delivery</th>
+              <th className="px-5 py-3">Status</th>
+              <th className="px-5 py-3">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/30">
+            {paginatedNotifications.length > 0 ? (
+              paginatedNotifications.map((n) => (
+                <tr key={n.id} className="hover:bg-white/40 transition">
+                  <td className="px-5 py-3 font-medium text-stone-900">
+                    <div>{n.title}</div>
+                    <div className="text-xs text-stone-500 font-normal">To: {n.createdBy}</div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs text-stone-700 uppercase">
+                      {n.delivery}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={cn(
+                      'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium',
+                      n.status === 'sent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    )}>
+                      {n.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-xs text-stone-500">
+                    {formatDate(n.createdAt)}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="px-5 py-12 text-center text-stone-500">
+                  No notification logs found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4">
-          <p className="text-sm text-stone-500">
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-xs text-stone-500">
             Page {currentPage} of {totalPages}
-          </p>
-          <div className="flex items-center gap-2">
+          </span>
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => handlePageChange(1)}
-              disabled={currentPage === 1}
-              className={cn(
-                "rounded-lg p-2 transition",
-                currentPage === 1 ? "text-stone-300 cursor-not-allowed" : "text-stone-500 hover:bg-stone-100"
-              )}
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </button>
-            <button
+              disabled={currentPage <= 1}
               onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={cn(
-                "rounded-lg p-2 transition",
-                currentPage === 1 ? "text-stone-300 cursor-not-allowed" : "text-stone-500 hover:bg-stone-100"
-              )}
+              className="rounded-lg border border-white/60 bg-white/40 p-1.5 text-stone-600 disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => handlePageChange(pageNum)}
-                    className={cn(
-                      "h-8 w-8 rounded-lg text-sm font-medium transition",
-                      currentPage === pageNum
-                        ? "bg-[#c3a26c] text-white"
-                        : "text-stone-600 hover:bg-stone-100"
-                    )}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-            
             <button
+              disabled={currentPage >= totalPages}
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={cn(
-                "rounded-lg p-2 transition",
-                currentPage === totalPages ? "text-stone-300 cursor-not-allowed" : "text-stone-500 hover:bg-stone-100"
-              )}
+              className="rounded-lg border border-white/60 bg-white/40 p-1.5 text-stone-600 disabled:opacity-40"
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => handlePageChange(totalPages)}
-              disabled={currentPage === totalPages}
-              className={cn(
-                "rounded-lg p-2 transition",
-                currentPage === totalPages ? "text-stone-300 cursor-not-allowed" : "text-stone-500 hover:bg-stone-100"
-              )}
-            >
-              <ChevronsRight className="h-4 w-4" />
             </button>
           </div>
         </div>
