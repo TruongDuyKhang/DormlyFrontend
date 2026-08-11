@@ -1,11 +1,5 @@
 "use client";
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
@@ -13,7 +7,6 @@ import { api } from "@/lib/axios";
 import { tokenService } from "@/services/tokenService";
 import { AuthUser } from "@/types/auth";
 import { getRedirectPathByRole } from "@/lib/getRedirectPathByRole";
-import { authService } from "@/services/authService";
 
 type RegisterPayload = {
   fullname: string;
@@ -60,10 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Restore session from localStorage on mount
   useEffect(() => {
     try {
-      const raw =
-        typeof window !== "undefined"
-          ? localStorage.getItem(SESSION_KEY)
-          : null;
+      const raw = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
       const token = tokenService.getAccessToken();
 
       if (raw && tokenService.hasValidToken()) {
@@ -94,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (user && (pathname === "/login" || pathname === "/register")) {
+      if (user && (pathname === "/login" || pathname === "/register" || pathname === "/")) {
         setIsRedirecting(true);
         router.replace(getRedirectPathByRole(user.roles));
         return;
@@ -112,8 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login: async (email, password) => {
         setLoading(true);
         try {
-          const res = await authService.login({ email, password });
-          const { accessToken, fullName, roles } = res.result;
+          const res = await api.post("/api/v1/auth/login", { email, password });
+          const { accessToken, fullName, roles } = res.data.result;
 
           tokenService.setAccessToken(accessToken);
 
@@ -132,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           toast.success("Login successful");
         } catch (err: any) {
           const msg = axios.isAxiosError(err)
-            ? (err.response?.data?.message ?? "Login failed")
+            ? err.response?.data?.message ?? "Login failed"
             : "Login failed";
           toast.error(msg);
           throw new Error(msg);
@@ -149,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { email: data.email };
         } catch (err: any) {
           const msg = axios.isAxiosError(err)
-            ? (err.response?.data?.message ?? "Registration failed")
+            ? err.response?.data?.message ?? "Registration failed"
             : "Registration failed";
           toast.error(msg);
           throw new Error(msg);
@@ -166,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.replace("/login");
         } catch (err: any) {
           const msg = axios.isAxiosError(err)
-            ? (err.response?.data?.message ?? "Invalid verification code")
+            ? err.response?.data?.message ?? "Invalid verification code"
             : "Invalid verification code";
           toast.error(msg);
           throw new Error(msg);
@@ -183,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.replace("/login");
         } catch (err: any) {
           const msg = axios.isAxiosError(err)
-            ? (err.response?.data?.message ?? "Request failed")
+            ? err.response?.data?.message ?? "Request failed"
             : "Request failed";
           toast.error(msg);
           throw new Error(msg);
@@ -193,22 +183,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
 
       logout: async () => {
+        setLoading(true);
         try {
           const token = tokenService.getAccessToken();
           if (token) {
-            await authService.logout(); // 👈 gọi qua service
+            await api.post("/api/v1/auth/logout");
           }
         } catch (err) {
           console.warn("Logout error:", err);
         } finally {
+          setUser(null);
           localStorage.removeItem(SESSION_KEY);
           tokenService.clearAccessToken();
           toast.success("Logged out successfully");
-          window.location.href = "/login";
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          window.location.replace("/login");
         }
       },
     }),
-    [user, loading, router],
+    [user, loading, router]
   );
 
   if (loading || isRedirecting) {
