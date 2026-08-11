@@ -1,10 +1,14 @@
+// app/(auth)/context/auth-context.tsx
 "use client";
+
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
 import { api } from "@/lib/axios";
 import { tokenService } from "@/services/tokenService";
+import { authService } from "@/services/authService";
+import { signInWithGoogle } from "@/lib/firebase";
 import { AuthUser } from "@/types/auth";
 import { getRedirectPathByRole } from "@/lib/getRedirectPathByRole";
 
@@ -22,7 +26,8 @@ type ForgetPasswordPayload = {
 type AuthContextType = {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<string>;
+  loginWithGoogle: () => Promise<string>;
   register: (data: RegisterPayload) => Promise<{ email: string }>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   forgetPassword: (data: ForgetPasswordPayload) => Promise<void>;
@@ -50,13 +55,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Restore session from localStorage on mount
+  // Restore session on mount
   useEffect(() => {
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
       const token = tokenService.getAccessToken();
 
-      if (raw && tokenService.hasValidToken()) {
+      if (raw && token && tokenService.hasValidToken()) {
         const parsedUser = JSON.parse(raw);
         setUser(parsedUser);
       } else {
@@ -65,29 +70,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } catch (err) {
-      console.debug("AuthProvider: failed to parse session", err);
+      console.debug("AuthProvider: failed to restore session", err);
       localStorage.removeItem(SESSION_KEY);
       tokenService.clearAccessToken();
+      setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Guard xử lý cả 2 chiều
+  // Role-based route guard
   useEffect(() => {
     if (!loading) {
       const isPublic = PUBLIC_ROUTES.includes(pathname);
 
+      // Not logged in -> redirect to login if attempting private route
       if (!user && !isPublic) {
         setIsRedirecting(true);
         router.replace("/login");
         return;
       }
 
+      // Logged in -> redirect if on login/register/landing
       if (user && (pathname === "/login" || pathname === "/register" || pathname === "/")) {
         setIsRedirecting(true);
-        router.replace(getRedirectPathByRole(user.roles));
+        const target = getRedirectPathByRole(user.roles);
+        router.replace(target);
         return;
+      }
+
+      // Role authorization protection: student cannot access /platform
+      if (user && pathname.startsWith("/platform")) {
+        const normalized = (user.roles || []).map((r) => r.toLowerCase().replace("role_", ""));
+        const isStaffOrAdmin = normalized.some((r) => ["manager", "admin", "staff"].includes(r));
+        if (!isStaffOrAdmin) {
+          setIsRedirecting(true);
+          toast.error("You do not have permission to access the management platform.");
+          router.replace("/student/home");
+          return;
+        }
       }
 
       setIsRedirecting(false);
@@ -102,28 +123,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login: async (email, password) => {
         setLoading(true);
         try {
-          const res = await api.post("/api/v1/auth/login", { email, password });
-          const { accessToken, fullName, roles } = res.data.result;
+          const result = await authService.login({ email, password });
+          const { accessToken, fullName, roles } = result;
 
           tokenService.setAccessToken(accessToken);
-
           const decoded = decodeJWT(accessToken);
 
           const authUser: AuthUser = {
             id: decoded?.id || "",
-            fullname: fullName,
+            fullname: fullName || decoded?.fullname || email.split("@")[0],
             email: decoded?.email || email,
-            phonenumber: undefined,
-            roles: roles ?? [],
+            roles: roles ?? decoded?.roles ?? [],
           };
 
           localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
           setUser(authUser);
           toast.success("Login successful");
+
+          const target = getRedirectPathByRole(authUser.roles);
+          router.replace(target);
+          return target;
         } catch (err: any) {
           const msg = axios.isAxiosError(err)
-            ? err.response?.data?.message ?? "Login failed"
-            : "Login failed";
+            ? err.response?.data?.message ?? "Login failed. Please check your credentials."
+            : err.message || "Login failed";
+          toast.error(msg);
+          throw new Error(msg);
+        } finally {
+          setLoading(false);
+        }
+      },
+
+      loginWithGoogle: async () => {
+        setLoading(true);
+        try {
+          const idToken = await signInWithGoogle();
+          const result = await authService.loginWithFirebase({ token: idToken });
+          const { accessToken, fullName, roles } = result;
+
+          tokenService.setAccessToken(accessToken);
+          const decoded = decodeJWT(accessToken);
+
+          const authUser: AuthUser = {
+            id: decoded?.id || "",
+            fullname: fullName || decoded?.fullname || "Google User",
+            email: decoded?.email || "",
+            roles: roles ?? decoded?.roles ?? ["ROLE_USER"],
+          };
+
+          localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+          setUser(authUser);
+          toast.success("Google Login successful");
+
+          const target = getRedirectPathByRole(authUser.roles);
+          router.replace(target);
+          return target;
+        } catch (err: any) {
+          const msg = axios.isAxiosError(err)
+            ? err.response?.data?.message ?? "Google Login failed"
+            : err.message || "Google Login failed";
           toast.error(msg);
           throw new Error(msg);
         } finally {
@@ -185,15 +243,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         setLoading(true);
         try {
-          const token = tokenService.getAccessToken();
-          if (token) {
-            await api.post("/api/v1/auth/logout");
-          }
+          await authService.logout().catch(() => {});
         } catch (err) {
           console.warn("Logout error:", err);
         } finally {
           setUser(null);
           localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem("user");
           tokenService.clearAccessToken();
           toast.success("Logged out successfully");
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -206,8 +262,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (loading || isRedirecting) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="flex h-screen items-center justify-center bg-[#f7f5f0]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-3 border-[#c3a26c] border-t-transparent" />
+          <span className="text-sm font-medium text-stone-600">Authenticating session...</span>
+        </div>
       </div>
     );
   }
@@ -222,6 +281,7 @@ function decodeJWT(token: string) {
     return {
       id: payload.id || "",
       email: payload.sub || "",
+      fullname: payload.fullname || payload.name || "",
       roles: payload.roles || [],
     };
   } catch {

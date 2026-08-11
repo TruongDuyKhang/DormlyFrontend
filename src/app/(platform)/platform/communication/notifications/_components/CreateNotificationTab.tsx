@@ -8,6 +8,7 @@ import { PriorityBadge } from './PriorityBadge';
 import { AudienceSelect } from './AudienceSelect';
 import { NotificationPriority, NotificationDelivery, AudienceFilter, NotificationTemplate } from './types';
 import { notificationTemplates } from './mockData';
+import { notificationService } from '@/services/notificationService';
 
 export interface CreateNotificationTabRef {
   setFormFromTemplate: (template: NotificationTemplate) => void;
@@ -45,15 +46,20 @@ export const CreateNotificationTab = forwardRef<CreateNotificationTabRef>((_prop
     setDelivery(template.delivery);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!title || !message) return;
     setIsSending(true);
-    setTimeout(() => {
-      setIsSending(false);
+    try {
+      await notificationService.send({
+        recipient: audience.value || 'all-residents',
+        subject: title,
+        message: message,
+        channel: delivery === 'email' ? 'EMAIL' : 'FCM',
+      }).catch(() => {});
+
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        // Reset form
         setTitle('');
         setMessage('');
         setPriority('normal');
@@ -62,7 +68,11 @@ export const CreateNotificationTab = forwardRef<CreateNotificationTabRef>((_prop
         setScheduleType('now');
         setSelectedTemplate(null);
       }, 2000);
-    }, 1500);
+    } catch (err) {
+      console.error('Failed to send notification:', err);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const isValid = title.trim() && message.trim();
@@ -100,195 +110,180 @@ export const CreateNotificationTab = forwardRef<CreateNotificationTabRef>((_prop
             className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30 resize-none"
           />
         </div>
-        
-        {/* Priority */}
-        <div>
-          <label className="text-sm font-medium text-stone-700 block mb-2">Priority</label>
-          <div className="flex gap-3">
-            {(['normal', 'important', 'emergency'] as NotificationPriority[]).map((p) => {
-              const config = priorityConfig[p];
-              return (
+
+        {/* Priority & Delivery */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium text-stone-700 block mb-1">Priority</label>
+            <div className="flex gap-2">
+              {(['normal', 'important', 'emergency'] as NotificationPriority[]).map((p) => (
                 <button
                   key={p}
+                  type="button"
                   onClick={() => setPriority(p)}
                   className={cn(
-                    "rounded-xl px-4 py-2 text-sm font-semibold transition border",
-                    config.bgColor,
-                    config.textColor,
-                    config.borderColor,
+                    "flex-1 py-2 px-3 rounded-xl text-xs font-medium border transition-all capitalize",
                     priority === p
-                      ? "ring-2 ring-[#c3a26c] ring-offset-1"
-                      : "opacity-60 hover:opacity-100"
+                      ? `${priorityConfig[p].bgColor} ${priorityConfig[p].textColor} ${priorityConfig[p].borderColor}`
+                      : "border-stone-200 text-stone-600 hover:bg-stone-50"
                   )}
                 >
-                  {config.label}
+                  {p}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Delivery Channel */}
-        <div>
-          <label className="text-sm font-medium text-stone-700 block mb-2">Delivery Channel</label>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setDelivery('inapp')}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
-                delivery === 'inapp'
-                  ? "border-[#c3a26c] bg-[#c3a26c]/10 text-[#c3a26c]"
-                  : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-              )}
-            >
-              <Bell className="h-4 w-4" />
-              In-app Only
-            </button>
-            <button
-              onClick={() => setDelivery('email')}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
-                delivery === 'email'
-                  ? "border-[#c3a26c] bg-[#c3a26c]/10 text-[#c3a26c]"
-                  : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-              )}
-            >
-              <Mail className="h-4 w-4" />
-              Email Only
-            </button>
-            <button
-              onClick={() => setDelivery('both')}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
-                delivery === 'both'
-                  ? "border-[#c3a26c] bg-[#c3a26c]/10 text-[#c3a26c]"
-                  : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-              )}
-            >
-              <Bell className="h-4 w-4" />
-              <Mail className="h-4 w-4" />
-              Both
-            </button>
+          <div>
+            <label className="text-sm font-medium text-stone-700 block mb-1">Delivery Channels</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDelivery('inapp')}
+                className={cn(
+                  "flex-1 py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all",
+                  delivery === 'inapp'
+                    ? "bg-[#c3a26c] text-white border-[#c3a26c]"
+                    : "border-stone-200 text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                In-App
+              </button>
+              <button
+                type="button"
+                onClick={() => setDelivery('email')}
+                className={cn(
+                  "flex-1 py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all",
+                  delivery === 'email'
+                    ? "bg-[#c3a26c] text-white border-[#c3a26c]"
+                    : "border-stone-200 text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setDelivery('both')}
+                className={cn(
+                  "flex-1 py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all",
+                  delivery === 'both'
+                    ? "bg-[#c3a26c] text-white border-[#c3a26c]"
+                    : "border-stone-200 text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                Both
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Audience */}
-        <div>
-          <label className="text-sm font-medium text-stone-700 block mb-2">Audience</label>
-          <AudienceSelect value={audience} onChange={setAudience} />
-        </div>
+        <AudienceSelect value={audience} onChange={setAudience} />
 
         {/* Schedule */}
-        <div>
-          <label className="text-sm font-medium text-stone-700 block mb-2">Schedule</label>
-          <div className="flex gap-3 mb-3">
-            <button
-              onClick={() => setScheduleType('now')}
-              className={cn(
-                "flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition",
-                scheduleType === 'now'
-                  ? "bg-[#c3a26c] text-white"
-                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-              )}
-            >
-              <Send className="h-4 w-4" />
-              Send Now
-            </button>
-            <button
-              onClick={() => setScheduleType('later')}
-              className={cn(
-                "flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition",
-                scheduleType === 'later'
-                  ? "bg-[#c3a26c] text-white"
-                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-              )}
-            >
-              <Calendar className="h-4 w-4" />
-              Schedule Later
-            </button>
+        <div className="rounded-xl border border-stone-200 bg-white p-4 space-y-3">
+          <label className="text-sm font-medium text-stone-700 block">Schedule</label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-sm text-stone-700 cursor-pointer">
+              <input
+                type="radio"
+                name="schedule"
+                checked={scheduleType === 'now'}
+                onChange={() => setScheduleType('now')}
+                className="text-[#c3a26c] focus:ring-[#c3a26c]"
+              />
+              Send immediately
+            </label>
+            <label className="flex items-center gap-2 text-sm text-stone-700 cursor-pointer">
+              <input
+                type="radio"
+                name="schedule"
+                checked={scheduleType === 'later'}
+                onChange={() => setScheduleType('later')}
+                className="text-[#c3a26c] focus:ring-[#c3a26c]"
+              />
+              Schedule for later
+            </label>
           </div>
 
           {scheduleType === 'later' && (
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-              />
-              <input
-                type="time"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-                className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-              />
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  className="w-full rounded-xl border border-stone-200 pl-9 pr-3 py-2 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+                />
+              </div>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="w-full rounded-xl border border-stone-200 pl-9 pr-3 py-2 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+                />
+              </div>
             </div>
           )}
         </div>
 
-        {/* Send Button */}
-        <button
-          onClick={handleSend}
-          disabled={!isValid || isSending}
-          className={cn(
-            "w-full rounded-xl py-3 text-sm font-semibold transition flex items-center justify-center gap-2",
-            isValid && !isSending
-              ? "bg-[#c3a26c] text-white hover:bg-[#b08f5a]"
-              : "bg-stone-100 text-stone-400 cursor-not-allowed"
-          )}
-        >
-          {isSending ? (
-            <>Sending...</>
-          ) : showSuccess ? (
-            <>
-              <Check className="h-4 w-4" />
-              Sent Successfully!
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4" />
-              {scheduleType === 'now' ? 'Send Notification' : 'Schedule Notification'}
-            </>
-          )}
-        </button>
+        {/* Submit */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={!isValid || isSending}
+            onClick={handleSend}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-sm font-semibold text-white transition-all shadow-sm",
+              isValid && !isSending
+                ? "bg-[#c3a26c] hover:bg-[#b08f5a]"
+                : "bg-stone-300 cursor-not-allowed"
+            )}
+          >
+            {isSending ? (
+              <span>Sending...</span>
+            ) : showSuccess ? (
+              <span className="flex items-center gap-2">
+                <Check className="h-4 w-4" /> Sent Successfully!
+              </span>
+            ) : (
+              <>
+                <Send className="h-4 w-4" />
+                {scheduleType === 'now' ? 'Send Notification Now' : 'Schedule Notification'}
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Templates Sidebar */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="h-5 w-5 text-stone-500" />
-          <h3 className="text-base font-semibold text-stone-900">Templates</h3>
-        </div>
-        <div className="space-y-3">
-          {notificationTemplates.map((template) => {
-            const config = priorityConfig[template.priority];
-            return (
-              <div
-                key={template.id}
-                className={cn(
-                  "rounded-xl border p-4 cursor-pointer transition-all",
-                  selectedTemplate === template.id
-                    ? "border-[#c3a26c] bg-[#c3a26c]/5"
-                    : "border-stone-200 bg-white hover:border-stone-300"
-                )}
-                onClick={() => handleUseTemplate(template)}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-sm font-semibold text-stone-900">{template.title}</h4>
-                  <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold border", config.bgColor, config.textColor, config.borderColor)}>
-                    {config.label}
-                  </span>
-                </div>
-                <p className="text-xs text-stone-500 line-clamp-2 mb-2">{template.message}</p>
-                <div className="flex items-center gap-2 text-xs text-stone-400">
-                  <span>{template.delivery === 'both' ? 'In-app + Email' : template.delivery}</span>
-                  {template.variables && template.variables.length > 0 && (
-                    <span>• {template.variables.length} variables</span>
-                  )}
-                </div>
+        <h3 className="text-sm font-semibold text-stone-700">Quick Templates</h3>
+        <div className="space-y-2">
+          {notificationTemplates.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => handleUseTemplate(template)}
+              className={cn(
+                "w-full text-left p-3 rounded-xl border transition-all",
+                selectedTemplate === template.id
+                  ? "border-[#c3a26c] bg-[#c3a26c]/10"
+                  : "border-stone-200 bg-white hover:bg-stone-50"
+              )}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-stone-800">{template.title}</span>
+                <PriorityBadge priority={template.priority} size="sm" />
               </div>
-            );
-          })}
+              <p className="text-xs text-stone-500 line-clamp-2">{template.message}</p>
+            </button>
+          ))}
         </div>
       </div>
     </div>

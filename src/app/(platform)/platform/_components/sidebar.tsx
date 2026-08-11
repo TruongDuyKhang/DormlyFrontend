@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   BarChart3,
@@ -24,6 +24,11 @@ import {
   Layers,
   Bot,
   Activity,
+  Receipt,
+  ArrowLeftRight,
+  FileCheck2,
+  ShieldCheck,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/_components/ui/button";
@@ -33,6 +38,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/_components/ui/tooltip";
+import { useAuth } from "@/app/(auth)/context/auth-context";
 
 interface SubMenuItem {
   label: string;
@@ -59,16 +65,26 @@ const menuItems: MenuItem[] = [
     submenu: [
       { label: "Students", href: "/platform/residents/students" },
       { label: "Assignments", href: "/platform/residents/assignments" },
+      { label: "Accounts", href: "/platform/residents/accounts" },
+      { label: "Documents", href: "/platform/residents/documents" },
     ]
   },
   { 
     icon: ClipboardList, 
     label: "Operations", 
     submenu: [
-      // { label: "Rooms", href: "/platform/operations/rooms" },
+      { label: "Building Map", href: "/platform/operations/rooms" },
+      { label: "Service Tickets", href: "/platform/operations/tickets" },
+      { label: "Room Transfers", href: "/platform/operations/transfers" },
+      { label: "Invoices & Billing", href: "/platform/operations/invoices" },
       { label: "Complaints", href: "/platform/operations/complaints" },
-      { label: "Tickets", href: "/platform/operations/tickets" },
-      // { label: "Chat", href: "/platform/operations/chat" },
+    ]
+  },
+  { 
+    icon: MessageSquare, 
+    label: "Communication", 
+    submenu: [
+      { label: "Notifications & News", href: "/platform/communication/notifications" },
     ]
   },
   { 
@@ -76,295 +92,221 @@ const menuItems: MenuItem[] = [
     label: "Analytics", 
     submenu: [
       { label: "Insights", href: "/platform/analytics/insights" },
-      // { label: "Reports", href: "/platform/analytics/reports" },
+      { label: "Reports", href: "/platform/analytics/reports" },
     ]
   },
-  // { 
-  //   icon: MessageSquare, 
-  //   label: "Communication", 
-  //   submenu: [
-  //     { label: "Notifications", href: "/platform/communication/notifications" },
-  //   ]
-  // },
   { 
     icon: Settings, 
     label: "Settings", 
     submenu: [
       { label: "Residence Structure", href: "/platform/settings/structure" },
+      { label: "Roles & Permissions", href: "/platform/settings/roles" },
+      { label: "System Events", href: "/platform/settings/activity-logs" },
       { label: "AI Assistant", href: "/platform/settings/ai-assistant" },
-      { label: "Activity Logs", href: "/platform/settings/activity-logs" },
     ]
   },
 ];
 
 interface SidebarProps {
-  collapsed: boolean;
-  onToggle: () => void;
-  isMobile: boolean;
+  onClose?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  isMobile?: boolean;
 }
 
-export function Sidebar({ collapsed, onToggle, isMobile }: SidebarProps) {
+export function Sidebar({ onClose, collapsed: propCollapsed, onToggle, isMobile }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [expandedItems, setExpandedItems] = useState<string[]>(["Operations", "Dashboard", "Settings"]);
+  const { logout } = useAuth();
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
+    Residents: true,
+    Operations: true,
+    Settings: true,
+  });
+  const [localCollapsed, setLocalCollapsed] = useState(false);
+  const collapsed = propCollapsed !== undefined ? propCollapsed : localCollapsed;
+  const setCollapsed = onToggle || setLocalCollapsed;
 
-  const isActive = (href?: string) => {
-    if (!href) return false;
-    return pathname === href || pathname?.startsWith(`${href}/`);
+  // Auto-expand submenu if current path matches
+  useEffect(() => {
+    menuItems.forEach((item) => {
+      if (item.submenu?.some((sub) => pathname.startsWith(sub.href))) {
+        setOpenMenus((prev) => ({ ...prev, [item.label]: true }));
+      }
+    });
+  }, [pathname]);
+
+  const toggleSubmenu = (label: string) => {
+    if (collapsed) {
+      setCollapsed(false);
+    }
+    setOpenMenus((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
   };
 
-  const isSubmenuActive = (submenu?: SubMenuItem[]) => {
-    if (!submenu) return false;
-    return submenu.some(item => isActive(item.href));
+  const isActive = (item: MenuItem) => {
+    if (item.href) {
+      return pathname === item.href || pathname?.startsWith(`${item.href}/`);
+    }
+    if (item.submenu) {
+      return item.submenu.some((sub) => pathname.startsWith(sub.href));
+    }
+    return false;
   };
 
-  const toggleExpand = (label: string) => {
-    setExpandedItems(prev => 
-      prev.includes(label) 
-        ? prev.filter(item => item !== label)
-        : [...prev, label]
-    );
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("dormly_language");
-    localStorage.removeItem("dormly_profile");
-    localStorage.removeItem("dormly_auth_token");
-    localStorage.removeItem("dormly_user");
-    sessionStorage.clear();
-    router.push("/login");
+  const isSubmenuActive = (sub: SubMenuItem) => {
+    return pathname === sub.href || pathname?.startsWith(`${sub.href}/`);
   };
 
   return (
-    <>
-      {!collapsed && isMobile && (
-        <button
-          aria-label="Close navigation"
-          className="fixed inset-0 z-40 bg-stone-950/35 backdrop-blur-sm lg:hidden"
-          onClick={onToggle}
-        />
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-30 flex h-screen flex-col border-r border-white/55 bg-[#e8e2d8]/85 shadow-[0_20px_50px_rgba(38,35,31,0.06)] backdrop-blur-2xl transition-all duration-300",
+        collapsed ? "w-20" : "w-72",
+        isMobile && (collapsed ? "-translate-x-full" : "translate-x-0")
       )}
-
-      <aside
-        className={cn(
-          "fixed left-0 top-0 z-50 flex h-full flex-col border-r border-white/45 bg-[#27231f]/92 text-stone-100 shadow-[20px_0_80px_-55px_rgba(38,35,31,0.9)] backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
-          collapsed ? "w-24" : "w-[19rem]",
-          isMobile && collapsed ? "-translate-x-full" : "translate-x-0"
-        )}
-      >
-        {/* Scrollbar Styling */}
-        <style>{`
-          .sidebar-nav::-webkit-scrollbar {
-            width: 6px;
-          }
-          .sidebar-nav::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .sidebar-nav::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            transition: background 0.2s;
-          }
-          .sidebar-nav::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.35);
-          }
-        `}</style>
-
-        {/* Header với logo - text sát bên logo */}
-        <div className={cn("flex h-24 items-center border-b border-white/10 px-5 gap-3", collapsed ? "justify-center" : "")}>
-          <Link href="/platform/dashboard" className={cn("flex items-center flex-shrink-0 gap-6", collapsed ? "justify-center" : "")}>
-            {/* Logo - kích thước nhỏ, sát text */}
-            <div className="w-14 h-14 flex-shrink-0 flex items-center justify-center">
-              <Image
-                src="/logo_white.png"
-                alt="Dormly Logo"
-                width={56}
-                height={56}
-                className="object-contain"
-                priority
-              />
-            </div>
-            {/* Text sát bên logo */}
-            {!collapsed && (
-              <div className="flex flex-col flex-shrink-0 gap-0">
-                <span className="text-base font-semibold tracking-tight leading-tight text-white">Dormly</span>
-                <span className="text-[0.62rem] uppercase tracking-[0.2em] text-stone-400 leading-tight">
-                  ADMIN RESIDENCE OS
-                </span>
-              </div>
-            )}
-          </Link>
-
+    >
+      {/* Header */}
+      <div className="flex h-20 items-center justify-between px-5 border-b border-white/45">
+        <Link
+          href="/platform/dashboard"
+          className={cn("flex items-center gap-3", collapsed && "justify-center")}
+        >
+          <div className="flex h-11 w-11 items-center justify-center">
+            <Image
+              src="/logo_black.png"
+              alt="Dormly"
+              width={40}
+              height={40}
+              className="object-contain"
+            />
+          </div>
           {!collapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggle}
-              className="h-9 w-9 rounded-full text-stone-400 hover:bg-white/8 hover:text-stone-100 flex-shrink-0 ml-auto"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+            <div className="flex flex-col">
+              <span className="text-base font-bold tracking-tight text-stone-900 leading-tight">
+                DORMLY
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.24em] text-stone-500 font-semibold leading-tight">
+                Management OS
+              </span>
+            </div>
           )}
-        </div>
+        </Link>
+
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(true)}
+            className="rounded-full p-1.5 text-stone-400 hover:bg-white/60 hover:text-stone-700 transition"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Nav items */}
+      <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-1.5">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item);
+          const hasSubmenu = Boolean(item.submenu);
+          const isOpen = openMenus[item.label];
+
+          if (hasSubmenu) {
+            return (
+              <div key={item.label} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => toggleSubmenu(item.label)}
+                  className={cn(
+                    "w-full flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-semibold transition group",
+                    active
+                      ? "bg-white/75 text-stone-900 shadow-sm"
+                      : "text-stone-600 hover:bg-white/45 hover:text-stone-900"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={cn("h-4 w-4", active ? "text-[#c3a26c]" : "text-stone-500")} />
+                    {!collapsed && <span>{item.label}</span>}
+                  </div>
+                  {!collapsed && (
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-stone-400 transition-transform duration-200",
+                        isOpen && "rotate-180"
+                      )}
+                    />
+                  )}
+                </button>
+
+                {!collapsed && isOpen && item.submenu && (
+                  <div className="pl-9 space-y-1 pt-0.5">
+                    {item.submenu.map((sub) => {
+                      const subActive = isSubmenuActive(sub);
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          onClick={onClose}
+                          className={cn(
+                            "block rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                            subActive
+                              ? "bg-[#c3a26c]/15 text-[#8f6d38] font-bold"
+                              : "text-stone-500 hover:text-stone-900 hover:bg-white/40"
+                          )}
+                        >
+                          {sub.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={item.label}
+              href={item.href || "#"}
+              onClick={onClose}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition",
+                active
+                  ? "bg-white/75 text-stone-900 shadow-sm"
+                  : "text-stone-600 hover:bg-white/45 hover:text-stone-900"
+              )}
+            >
+              <Icon className={cn("h-4 w-4", active ? "text-[#c3a26c]" : "text-stone-500")} />
+              {!collapsed && <span>{item.label}</span>}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-white/45">
+        <button
+          onClick={() => logout()}
+          className={cn(
+            "w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50/80 transition",
+            collapsed && "justify-center"
+          )}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span>Logout</span>}
+        </button>
 
         {collapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggle}
-            className="absolute -right-3 top-8 h-7 w-7 rounded-full border border-white/20 bg-[#2b2722] text-stone-300 shadow-lg hover:bg-[#383229] hover:text-stone-100"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
-        )}
-
-        {/* Navigation */}
-        <nav className="sidebar-nav flex-1 overflow-y-auto px-3 py-5">
-          <div className="mb-4 px-3 text-[0.66rem] font-medium uppercase tracking-[0.26em] text-stone-500">
-            {!collapsed ? "Platform" : "Menu"}
-          </div>
-
-          <div className="space-y-1">
-            {menuItems.map((item) => {
-              const hasSubmenu = item.submenu && item.submenu.length > 0;
-              const isExpanded = expandedItems.includes(item.label);
-              const active = isActive(item.href) || isSubmenuActive(item.submenu);
-
-              if (collapsed && hasSubmenu) {
-                return (
-                  <TooltipProvider key={item.label} delayDuration={200}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex justify-center">
-                          <button className="flex h-12 w-12 items-center justify-center rounded-2xl text-stone-400 transition hover:bg-white/7 hover:text-stone-100">
-                            <item.icon className="h-4.5 w-4.5" />
-                          </button>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{item.label}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                );
-              }
-
-              if (hasSubmenu) {
-                return (
-                  <div key={item.label}>
-                    <button
-                      onClick={() => toggleExpand(item.label)}
-                      className={cn(
-                        "group flex w-full min-h-12 items-center justify-between rounded-2xl px-3 text-sm transition duration-300 active:scale-[0.98]",
-                        active
-                          ? "bg-white/12 text-stone-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
-                          : "text-stone-400 hover:bg-white/7 hover:text-stone-100"
-                      )}
-                    >
-                      <span className="flex items-center gap-3">
-                        <item.icon
-                          className={cn(
-                            "h-4.5 w-4.5 transition",
-                            active ? "text-[#d2b47c]" : "text-stone-500 group-hover:text-stone-200"
-                          )}
-                        />
-                        <span className="font-medium">{item.label}</span>
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          "h-4 w-4 transition-transform duration-300",
-                          isExpanded ? "rotate-180" : ""
-                        )}
-                      />
-                    </button>
-
-                    {isExpanded && (
-                      <div className="mt-1.5 space-y-1 border-l border-white/10 pl-4 ml-3">
-                        {item.submenu?.map((subitem) => {
-                          const subActive = isActive(subitem.href);
-                          return (
-                            <Link
-                              key={subitem.href}
-                              href={subitem.href}
-                              className={cn(
-                                "group flex min-h-10 items-center rounded-lg px-3 text-xs transition duration-300 active:scale-[0.98]",
-                                subActive
-                                  ? "bg-white/12 text-stone-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
-                                  : "text-stone-400 hover:bg-white/7 hover:text-stone-100"
-                              )}
-                            >
-                              <span
-                                className={cn(
-                                  "h-1.5 w-1.5 rounded-full mr-2.5 transition",
-                                  subActive ? "bg-[#d2b47c]" : "bg-stone-500 group-hover:bg-stone-200"
-                                )}
-                              />
-                              {subitem.label}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              // Single item without submenu
-              return (
-                <TooltipProvider key={item.label} delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href={item.href || "#"}
-                        className={cn(
-                          "group flex min-h-12 items-center justify-between rounded-2xl px-3 text-sm transition duration-300 active:scale-[0.98]",
-                          collapsed ? "justify-center" : "gap-3",
-                          active
-                            ? "bg-white/12 text-stone-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
-                            : "text-stone-400 hover:bg-white/7 hover:text-stone-100"
-                        )}
-                      >
-                        <span className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-                          <item.icon
-                            className={cn(
-                              "h-4.5 w-4.5 transition",
-                              active ? "text-[#d2b47c]" : "text-stone-500 group-hover:text-stone-200"
-                            )}
-                          />
-                          {!collapsed && <span className="font-medium">{item.label}</span>}
-                        </span>
-                        {!collapsed && item.signal && (
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[0.65rem] font-medium",
-                              active ? "bg-[#d2b47c]/18 text-[#e1c995]" : "bg-white/8 text-stone-400"
-                            )}
-                          >
-                            {item.signal}
-                          </span>
-                        )}
-                      </Link>
-                    </TooltipTrigger>
-                    {collapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </div>
-        </nav>
-
-        {/* Footer - Logout */}
-        <div className="border-t border-white/10 p-3">
           <button
-            onClick={handleLogout}
-            className={cn(
-              "flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm text-stone-400 transition hover:bg-white/7 hover:text-stone-100 active:scale-[0.98]",
-              collapsed && "justify-center"
-            )}
+            onClick={() => setCollapsed(false)}
+            className="w-full mt-2 flex items-center justify-center p-2 text-stone-400 hover:text-stone-700"
           >
-            <LogOut className="h-4.5 w-4.5" />
-            {!collapsed && <span>Sign out</span>}
+            <ChevronRight className="h-4 w-4" />
           </button>
-        </div>
-      </aside>
-    </>
+        )}
+      </div>
+    </aside>
   );
 }

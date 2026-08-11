@@ -28,6 +28,15 @@ export function PersonalInfo({ student, onUpdate }: PersonalInfoProps) {
   const genderDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setFormData({
+      fullName: student.fullName,
+      phoneNumber: student.phoneNumber,
+      gender: student.gender,
+      dateOfBirth: student.dateOfBirth,
+    });
+  }, [student]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (genderDropdownRef.current && !genderDropdownRef.current.contains(event.target as Node)) {
         setIsGenderDropdownOpen(false);

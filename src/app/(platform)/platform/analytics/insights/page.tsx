@@ -80,7 +80,7 @@ export default function InsightsPage() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-0">
-            <OverviewTab />
+            <OverviewTab dateRange={dateRange} />
           </TabsContent>
 
           <TabsContent value="residents" className="mt-0">

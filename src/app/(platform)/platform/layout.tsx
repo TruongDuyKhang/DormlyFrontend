@@ -50,13 +50,20 @@ export default function PlatformLayout({
           onToggle={() => setSidebarCollapsed((current) => !current)}
           isMobile={isMobile}
         />
+        {/* Mobile backdrop overlay when sidebar is open */}
+        {isMobile && !sidebarCollapsed && (
+          <div
+            className="fixed inset-0 z-20 bg-stone-950/40 backdrop-blur-sm transition-opacity duration-300"
+            onClick={() => setSidebarCollapsed(true)}
+          />
+        )}
         <div
           className={cn(
             "relative transition-[margin] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
-            isMobile ? "ml-0" : sidebarCollapsed ? "ml-24" : "ml-[19rem]"
+            isMobile ? "ml-0" : sidebarCollapsed ? "ml-20" : "ml-72"
           )}
         >
-          <Header onMenuClick={() => setSidebarCollapsed(false)} />
+          <Header onMenuClick={() => setSidebarCollapsed((prev) => !prev)} />
           <main className="px-3 pb-5 pt-3 sm:px-5 sm:pb-8 lg:px-7">
             {children}
           </main>

@@ -3,12 +3,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Home } from "lucide-react";
+import { FileText, Home, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { label: "Room", href: "/student/residence/room", icon: Home },
   { label: "Documents", href: "/student/residence/documents", icon: FileText },
+  { label: "Invoices", href: "/student/residence/invoices", icon: Receipt },
 ];
 
 export function ResidenceTabs() {

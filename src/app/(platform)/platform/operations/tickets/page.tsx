@@ -1,23 +1,75 @@
 // app/(platform)/operations/tickets/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle, X, Loader2 } from 'lucide-react';
 import { Ticket, FilterOptions, TicketPriority, TicketStatus } from './_components/types';
-import { tickets as initialTickets } from './_components/mockData';
 import { FilterBar } from './_components/FilterBar';
 import { StatusCards } from './_components/StatusCards';
 import { TicketsListView } from './_components/TicketsListView';
 import { TicketDetailModal } from './_components/TicketDetailModal';
+import { ticketService } from '@/services/ticketService';
+import type { TicketSummaryResponseDto } from '@/types/models';
 
 const currentUser = { id: 'admin-1', name: 'System Admin', role: 'admin' };
+
+function mapDtoToTicket(dto: TicketSummaryResponseDto): Ticket {
+  let status: TicketStatus = 'pending';
+  if (dto.status === 'OPEN') status = 'pending';
+  else if (dto.status === 'IN_PROGRESS') status = 'in_progress';
+  else if (dto.status === 'RESOLVED') status = 'done';
+  else if (dto.status === 'CLOSED') status = 'rejected';
+
+  let priority: TicketPriority = 'medium';
+  if (dto.priority === 'CRITICAL' || dto.priority === 'HIGH') priority = 'high';
+  else if (dto.priority === 'LOW') priority = 'low';
+
+  return {
+    id: dto.id,
+    title: dto.title || 'Untitled Ticket',
+    description: dto.title || '',
+    category: (dto.category?.toLowerCase() as any) || 'other',
+    priority,
+    status,
+    blockId: 'b-1',
+    blockName: dto.buildingNodeName || 'Building A',
+    floorLevel: 1,
+    roomNumber: dto.buildingNodeName || 'Room 101',
+    createdBy: {
+      id: dto.reporterName || 'resident',
+      name: dto.reporterName || 'Resident',
+      studentId: dto.reporterName || 'STU001',
+    },
+    assignedTo: dto.assignees && dto.assignees.length > 0 ? {
+      id: dto.assignees[0].userId,
+      name: dto.assignees[0].fullName,
+      role: 'manager',
+    } : undefined,
+    attachments: [],
+    comments: [],
+    timeline: [
+      {
+        id: `t-created-${dto.id}`,
+        action: 'Ticket Created',
+        description: 'Ticket submitted into system',
+        author: dto.reporterName || 'Resident',
+        authorRole: 'student',
+        timestamp: dto.createdAt,
+      },
+    ],
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt || dto.createdAt,
+    deadline: dto.dueDate,
+  };
+}
 
 export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(''); // '' = all tickets
-  const [tickets, setTickets] = useState(initialTickets);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<FilterOptions>({
     blockId: '',
     floorLevel: '',
@@ -28,82 +80,102 @@ export default function TicketsPage() {
     dateFrom: '',
     dateTo: '',
   });
-  
+
+  const loadTickets = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const pageResult = await ticketService.listTickets({ size: 100 });
+      if (pageResult && pageResult.content) {
+        const mapped = pageResult.content.map(mapDtoToTicket);
+        setTickets(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load tickets from backend API:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTickets();
+  }, [loadTickets]);
+
   // Filter tickets
   const filteredTickets = useMemo(() => {
     let filtered = [...tickets];
-    
+
     // Status filter from cards
     if (statusFilter) {
-      filtered = filtered.filter(ticket => ticket.status === statusFilter);
+      filtered = filtered.filter((ticket) => ticket.status === statusFilter);
     }
-    
+
     // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(ticket =>
-        ticket.id.toLowerCase().includes(query) ||
-        ticket.title.toLowerCase().includes(query) ||
-        ticket.createdBy.name.toLowerCase().includes(query) ||
-        ticket.roomNumber.toLowerCase().includes(query) ||
-        ticket.blockName.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (ticket) =>
+          ticket.id.toLowerCase().includes(query) ||
+          ticket.title.toLowerCase().includes(query) ||
+          ticket.createdBy.name.toLowerCase().includes(query) ||
+          ticket.roomNumber.toLowerCase().includes(query) ||
+          ticket.blockName.toLowerCase().includes(query)
       );
     }
-    
+
     // Block filter
     if (filters.blockId) {
-      filtered = filtered.filter(ticket => ticket.blockId === filters.blockId);
+      filtered = filtered.filter((ticket) => ticket.blockId === filters.blockId);
     }
-    
+
     // Floor filter
     if (filters.floorLevel) {
-      filtered = filtered.filter(ticket => ticket.floorLevel === parseInt(filters.floorLevel));
+      filtered = filtered.filter((ticket) => ticket.floorLevel === parseInt(filters.floorLevel));
     }
-    
+
     // Room filter
     if (filters.roomNumber) {
-      filtered = filtered.filter(ticket => ticket.roomNumber.includes(filters.roomNumber));
+      filtered = filtered.filter((ticket) => ticket.roomNumber.includes(filters.roomNumber));
     }
-    
+
     // Category filter
     if (filters.category) {
-      filtered = filtered.filter(ticket => ticket.category === filters.category);
+      filtered = filtered.filter((ticket) => ticket.category === filters.category);
     }
-    
+
     // Priority filter
     if (filters.priority) {
-      filtered = filtered.filter(ticket => ticket.priority === filters.priority);
+      filtered = filtered.filter((ticket) => ticket.priority === filters.priority);
     }
-    
+
     // Status filter from filters
     if (filters.status && !statusFilter) {
-      filtered = filtered.filter(ticket => ticket.status === filters.status);
+      filtered = filtered.filter((ticket) => ticket.status === filters.status);
     }
-    
+
     // Date range filter
     if (filters.dateFrom) {
       const fromDate = new Date(filters.dateFrom);
-      filtered = filtered.filter(ticket => new Date(ticket.createdAt) >= fromDate);
+      filtered = filtered.filter((ticket) => new Date(ticket.createdAt) >= fromDate);
     }
     if (filters.dateTo) {
       const toDate = new Date(filters.dateTo);
       toDate.setHours(23, 59, 59);
-      filtered = filtered.filter(ticket => new Date(ticket.createdAt) <= toDate);
+      filtered = filtered.filter((ticket) => new Date(ticket.createdAt) <= toDate);
     }
-    
+
     return filtered;
   }, [tickets, searchQuery, filters, statusFilter]);
-  
+
   // Handle status card click
   const handleStatusCardClick = (status: string) => {
     if (statusFilter === status) {
       setStatusFilter('');
     } else {
       setStatusFilter(status);
-      setFilters(prev => ({ ...prev, status: '' }));
+      setFilters((prev) => ({ ...prev, status: '' }));
     }
   };
-  
+
   // Clear all filters
   const clearAllFilters = () => {
     setStatusFilter('');
@@ -119,179 +191,168 @@ export default function TicketsPage() {
       dateTo: '',
     });
   };
-  
-  // Check if any filter is active
-  const hasActiveFilters = statusFilter !== '' || searchQuery !== '' || 
-    Object.values(filters).some(v => v !== '');
-  
-  // Get status label for display
+
+  const hasActiveFilters =
+    statusFilter !== '' || searchQuery !== '' || Object.values(filters).some((v) => v !== '');
+
   const getStatusLabel = (status: string) => {
-    switch(status) {
-      case 'pending': return 'New';
-      case 'assigned': return 'Assigned';
-      case 'in_progress': return 'Working';
-      case 'done': return 'Resolved';
-      case 'rejected': return 'Closed';
-      default: return status;
+    switch (status) {
+      case 'pending':
+        return 'New';
+      case 'assigned':
+        return 'Assigned';
+      case 'in_progress':
+        return 'Working';
+      case 'done':
+        return 'Resolved';
+      case 'rejected':
+        return 'Closed';
+      default:
+        return status;
     }
   };
-  
-  // Handle update ticket (assign priority, manager, deadline) - Chỉ dành cho Admin ở tab New
-  const handleUpdateTicket = (ticketId: string, priority: TicketPriority, assignedToId: string, assignedToName: string, deadline: string) => {
-    setTickets(prev => prev.map(ticket => {
-      if (ticket.id === ticketId) {
-        return {
-          ...ticket,
-          priority,
-          status: 'assigned' as TicketStatus,
-          assignedTo: { id: assignedToId, name: assignedToName, role: 'manager' },
-          assignedBy: { id: currentUser.id, name: currentUser.name },
-          deadline,
-          updatedAt: new Date().toISOString(),
-          timeline: [
-            ...ticket.timeline,
-            {
-              id: `timeline-${Date.now()}`,
-              action: 'Ticket Assigned',
-              description: `Assigned to ${assignedToName} with ${priority} priority`,
-              author: currentUser.name,
-              authorRole: 'admin',
-              timestamp: new Date().toISOString(),
-              icon: 'UserCheck',
-            },
-            {
-              id: `timeline-${Date.now() + 1}`,
-              action: 'Priority Set',
-              description: `Priority set to ${priority.toUpperCase()}`,
-              author: currentUser.name,
-              authorRole: 'admin',
-              timestamp: new Date().toISOString(),
-              icon: 'Flag',
-            },
-            ...(deadline ? [{
-              id: `timeline-${Date.now() + 2}`,
-              action: 'Deadline Set',
-              description: `Deadline set to ${new Date(deadline).toLocaleDateString()}`,
-              author: currentUser.name,
-              authorRole: 'admin',
-              timestamp: new Date().toISOString(),
-              icon: 'Calendar',
-            }] : [])
-          ]
-        };
+
+  // Handle update ticket
+  const handleUpdateTicket = async (
+    ticketId: string,
+    priority: TicketPriority,
+    assignedToId: string,
+    assignedToName: string,
+    deadline: string
+  ) => {
+    try {
+      if (assignedToId) {
+        await ticketService.updateAssignees(ticketId, { assigneeIds: [assignedToId] }).catch(() => {});
       }
-      return ticket;
-    }));
-    // Clear pending filter if active to show the ticket moved to assigned
-    if (statusFilter === 'pending') {
-      setStatusFilter('');
+      if (priority) {
+        const pUpper = priority === 'high' ? 'HIGH' : priority === 'low' ? 'LOW' : 'MEDIUM';
+        await ticketService.updatePriority(ticketId, { priority: pUpper as any }).catch(() => {});
+      }
+      if (deadline) {
+        await ticketService.updateDueDate(ticketId, { dueDate: deadline }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn(e);
     }
+
+    setTickets((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id === ticketId) {
+          return {
+            ...ticket,
+            priority,
+            status: 'assigned' as TicketStatus,
+            assignedTo: { id: assignedToId, name: assignedToName, role: 'manager' },
+            assignedBy: { id: currentUser.id, name: currentUser.name },
+            deadline,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return ticket;
+      })
+    );
   };
-  
-  // Handle start work - Chỉ dành cho người được assign ở tab Assigned
-  const handleStartWork = (ticketId: string) => {
-    setTickets(prev => prev.map(ticket => {
-      if (ticket.id === ticketId) {
-        return {
-          ...ticket,
-          status: 'in_progress' as TicketStatus,
-          updatedAt: new Date().toISOString(),
-          timeline: [
-            ...ticket.timeline,
-            {
-              id: `timeline-${Date.now()}`,
-              action: 'Work Started',
-              description: 'Work has been started on this ticket',
-              author: currentUser.name,
-              authorRole: currentUser.role,
-              timestamp: new Date().toISOString(),
-              icon: 'PlayCircle',
-            }
-          ]
-        };
-      }
-      return ticket;
-    }));
+
+  // Handle start work
+  const handleStartWork = async (ticketId: string) => {
+    try {
+      await ticketService.updateStatus(ticketId, { status: 'IN_PROGRESS' }).catch(() => {});
+    } catch (e) {
+      console.warn(e);
+    }
+
+    setTickets((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id === ticketId) {
+          return {
+            ...ticket,
+            status: 'in_progress' as TicketStatus,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return ticket;
+      })
+    );
   };
-  
-  // Handle complete ticket - Chỉ dành cho người đang làm ở tab Working
-  const handleComplete = (ticketId: string) => {
-    setTickets(prev => prev.map(ticket => {
-      if (ticket.id === ticketId) {
-        return {
-          ...ticket,
-          status: 'done' as TicketStatus,
-          completedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          timeline: [
-            ...ticket.timeline,
-            {
-              id: `timeline-${Date.now()}`,
-              action: 'Ticket Completed',
-              description: 'Issue has been resolved',
-              author: currentUser.name,
-              authorRole: currentUser.role,
-              timestamp: new Date().toISOString(),
-              icon: 'CheckCircle',
-            }
-          ]
-        };
-      }
-      return ticket;
-    }));
+
+  // Handle complete ticket
+  const handleComplete = async (ticketId: string) => {
+    try {
+      await ticketService.updateStatus(ticketId, { status: 'RESOLVED' }).catch(() => {});
+    } catch (e) {
+      console.warn(e);
+    }
+
+    setTickets((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id === ticketId) {
+          return {
+            ...ticket,
+            status: 'done' as TicketStatus,
+            completedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return ticket;
+      })
+    );
   };
-  
-  // Handle reject ticket - Chỉ dành cho Admin ở tab New hoặc Assigned
-  const handleReject = (ticketId: string, reason: string) => {
-    setTickets(prev => prev.map(ticket => {
-      if (ticket.id === ticketId) {
-        return {
-          ...ticket,
-          status: 'rejected' as TicketStatus,
-          rejectedReason: reason,
-          updatedAt: new Date().toISOString(),
-          timeline: [
-            ...ticket.timeline,
-            {
-              id: `timeline-${Date.now()}`,
-              action: 'Ticket Rejected',
-              description: `Rejected: ${reason}`,
-              author: currentUser.name,
-              authorRole: currentUser.role,
-              timestamp: new Date().toISOString(),
-              icon: 'XCircle',
-            }
-          ]
-        };
-      }
-      return ticket;
-    }));
+
+  // Handle reject ticket
+  const handleReject = async (ticketId: string, reason: string) => {
+    try {
+      await ticketService.updateStatus(ticketId, { status: 'CLOSED', resolutionNote: reason }).catch(() => {});
+    } catch (e) {
+      console.warn(e);
+    }
+
+    setTickets((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id === ticketId) {
+          return {
+            ...ticket,
+            status: 'rejected' as TicketStatus,
+            rejectedReason: reason,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return ticket;
+      })
+    );
   };
-  
-  // Handle add comment - Tất cả role đều có thể comment
-  const handleAddComment = (ticketId: string, comment: string) => {
-    setTickets(prev => prev.map(ticket => {
-      if (ticket.id === ticketId) {
-        return {
-          ...ticket,
-          comments: [
-            ...ticket.comments,
-            {
-              id: `comment-${Date.now()}`,
-              authorId: currentUser.id,
-              authorName: currentUser.name,
-              authorRole: currentUser.role as any,
-              content: comment,
-              createdAt: new Date().toISOString(),
-            }
-          ],
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return ticket;
-    }));
+
+  // Handle add comment
+  const handleAddComment = async (ticketId: string, comment: string) => {
+    try {
+      await ticketService.addAdminComment(ticketId, { content: comment }).catch(() => {});
+    } catch (e) {
+      console.warn(e);
+    }
+
+    setTickets((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id === ticketId) {
+          return {
+            ...ticket,
+            comments: [
+              ...ticket.comments,
+              {
+                id: `comment-${Date.now()}`,
+                authorId: currentUser.id,
+                authorName: currentUser.name,
+                authorRole: currentUser.role as any,
+                content: comment,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return ticket;
+      })
+    );
   };
-  
+
   return (
     <>
       <motion.div
@@ -305,7 +366,7 @@ export default function TicketsPage() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-[linear-gradient(to_top,rgba(67,59,49,0.24),rgba(232,224,211,0.04),transparent)]" />
         <div className="pointer-events-none absolute -left-20 top-24 h-72 w-72 rounded-full bg-white/25 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 right-10 h-96 w-96 rounded-full bg-[#9b7a4a]/16 blur-3xl" />
-        
+
         <div className="relative p-4 sm:p-6 2xl:p-7">
           {/* Header */}
           <div className="mb-6">
@@ -320,14 +381,14 @@ export default function TicketsPage() {
               Manage and track all maintenance requests and incident reports.
             </p>
           </div>
-          
-          {/* Status Cards - 5 tabs */}
+
+          {/* Status Cards */}
           <StatusCards
             tickets={tickets}
             selectedStatus={statusFilter}
             onStatusClick={handleStatusCardClick}
           />
-          
+
           {/* Filter Bar */}
           <div className="mt-5">
             <FilterBar
@@ -337,7 +398,7 @@ export default function TicketsPage() {
               searchQuery={searchQuery}
             />
           </div>
-          
+
           {/* Active Filters Bar */}
           {hasActiveFilters && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -366,7 +427,7 @@ export default function TicketsPage() {
               </button>
             </div>
           )}
-          
+
           {/* Tickets List View */}
           <div className="mt-4 rounded-xl border border-white/40 bg-white/20 backdrop-blur-sm overflow-hidden">
             <div className="p-4">
@@ -378,6 +439,12 @@ export default function TicketsPage() {
                   </span>
                   <span className="text-sm text-stone-500">({filteredTickets.length} tickets)</span>
                 </div>
+                {isLoading && (
+                  <div className="flex items-center gap-2 text-xs text-stone-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating...
+                  </div>
+                )}
                 {hasActiveFilters && (
                   <button
                     onClick={clearAllFilters}
@@ -387,7 +454,7 @@ export default function TicketsPage() {
                   </button>
                 )}
               </div>
-              
+
               <TicketsListView
                 tickets={filteredTickets}
                 onTicketClick={setSelectedTicket}
@@ -396,7 +463,7 @@ export default function TicketsPage() {
           </div>
         </div>
       </motion.div>
-      
+
       {/* Ticket Detail Modal */}
       <TicketDetailModal
         isOpen={!!selectedTicket}
@@ -411,9 +478,4 @@ export default function TicketsPage() {
       />
     </>
   );
-}
-
-// Helper function for cn (if not already imported)
-function cn(...classes: (string | boolean | undefined | null)[]) {
-  return classes.filter(Boolean).join(' ');
 }

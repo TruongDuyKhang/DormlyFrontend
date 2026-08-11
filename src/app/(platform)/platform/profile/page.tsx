@@ -1,7 +1,7 @@
 // app/(platform)/platform/profile/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ProfileHeader } from './_components/ProfileHeader';
 import { ProfileTabs, TabType } from './_components/ProfileTabs';
@@ -9,31 +9,117 @@ import { ProfileInfoTab } from './_components/ProfileInfoTab';
 import { SecurityTab } from './_components/SecurityTab';
 import { ActivityTab } from './_components/ActivityTab';
 import { UserProfile } from './_components/types';
-
-const defaultProfile: UserProfile = {
-  name: 'Ari Renard',
-  email: 'ari@dormly.com',
-  phone: '+1 (555) 123-4567',
-  location: 'New York, USA',
-  role: 'System Administrator',
-  joinDate: 'January 15, 2024',
-  bio: 'Experienced system administrator with over 8 years in residence management systems.',
-};
+import { tokenService, decodeJWT } from '@/services/tokenService';
+import { userService } from '@/services/userService';
+import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>('info');
-  const [profile, setProfile] = useState<UserProfile>(defaultProfile);
+  const [isLoading, setIsLoading] = useState(true);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [profile, setProfile] = useState<UserProfile>({
+    id: '',
+    name: 'Administrator',
+    email: 'admin@dormly.com',
+    phone: '0901234567',
+    location: 'Hồ Chí Minh, Việt Nam',
+    role: 'System Administrator',
+    joinDate: 'Tháng 8, 2026',
+    bio: 'Ban Quản trị Hệ thống Ký túc xá Sinh viên Dormly.',
+    avatar: '',
+  });
 
-  useEffect(() => {
-    const saved = localStorage.getItem('dormly_profile');
-    if (saved) {
-      setProfile(JSON.parse(saved));
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const token = tokenService.getAccessToken();
+      const decoded = token ? decodeJWT(token) : null;
+      const stored = localStorage.getItem('session.user') || localStorage.getItem('user');
+      const sessionObj = stored ? JSON.parse(stored) : null;
+
+      let userId = sessionObj?.id || decoded?.id;
+      let userData: any = null;
+
+      if (userId) {
+        try {
+          userData = await userService.getById(userId);
+        } catch {
+          // If direct ID lookup fails, fallback to session data
+        }
+      }
+
+      const name = userData?.fullName || sessionObj?.fullName || decoded?.fullname || 'Administrator';
+      const email = userData?.email || sessionObj?.email || decoded?.email || 'admin@dormly.com';
+      const phone = userData?.phoneNumber || sessionObj?.phoneNumber || '0901234567';
+      const avatar = userData?.avatar || sessionObj?.avatar || '';
+      
+      const rolesArray = userData?.roles || sessionObj?.roles || decoded?.roles;
+      const roleStr = Array.isArray(rolesArray) && rolesArray.length > 0
+        ? rolesArray[0]?.replace('ROLE_', '')
+        : 'Administrator';
+
+      const createdAt = userData?.createdAt || sessionObj?.createdAt;
+      const joinDate = createdAt
+        ? new Date(createdAt).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+        : 'Tháng 8, 2026';
+
+      setProfile({
+        id: userId || '',
+        name,
+        email,
+        phone,
+        location: 'Hồ Chí Minh, Việt Nam',
+        role: roleStr.charAt(0).toUpperCase() + roleStr.slice(1).toLowerCase(),
+        joinDate,
+        bio: 'Ban Quản trị Hệ thống Ký túc xá Sinh viên Dormly.',
+        avatar,
+        gender: userData?.gender || sessionObj?.gender,
+        dateOfBirth: userData?.dateOfBirth || sessionObj?.dateOfBirth,
+      });
+    } catch (e) {
+      console.warn('Failed to load admin profile:', e);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
-  const handleUpdateProfile = (updatedProfile: UserProfile) => {
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  const handleUpdateProfile = async (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
-    localStorage.setItem('dormly_profile', JSON.stringify(updatedProfile));
+    try {
+      const stored = localStorage.getItem('session.user') || localStorage.getItem('user');
+      const sessionObj = stored ? JSON.parse(stored) : {};
+      const userId = profile.id || sessionObj.id;
+
+      if (userId) {
+        await userService.update(userId, {
+          email: updatedProfile.email,
+          fullName: updatedProfile.name,
+          phoneNumber: updatedProfile.phone,
+          avatar: updatedProfile.avatar,
+        } as any);
+      }
+
+      const updated = {
+        ...sessionObj,
+        fullName: updatedProfile.name,
+        phoneNumber: updatedProfile.phone,
+        avatar: updatedProfile.avatar,
+      };
+      localStorage.setItem('session.user', JSON.stringify(updated));
+      setFeedbackMessage({ type: 'success', text: 'Cập nhật thông tin tài khoản thành công!' });
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } catch (err: any) {
+      console.warn('Could not update admin user:', err);
+      setFeedbackMessage({ 
+        type: 'error', 
+        text: err?.response?.data?.message || 'Không thể lưu thay đổi trên máy chủ. Đã cập nhật tạm thời.' 
+      });
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    }
   };
 
   return (
@@ -50,23 +136,50 @@ export default function ProfilePage() {
         {/* Header */}
         <ProfileHeader />
 
+        {feedbackMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`mb-4 flex items-center gap-2 rounded-xl p-3.5 text-sm font-medium ${
+              feedbackMessage.type === 'success'
+                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-800'
+                : 'bg-rose-500/15 border border-rose-500/30 text-rose-800'
+            }`}
+          >
+            {feedbackMessage.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            )}
+            <span>{feedbackMessage.text}</span>
+          </motion.div>
+        )}
+
         {/* Tabs Navigation */}
         <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Tab Content */}
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 8 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {activeTab === 'info' && (
-            <ProfileInfoTab profile={profile} onUpdate={handleUpdateProfile} />
-          )}
-          {activeTab === 'security' && <SecurityTab />}
-          {activeTab === 'activity' && <ActivityTab />}
-        </motion.div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-24 gap-3 text-stone-500">
+            <Loader2 className="h-5 w-5 animate-spin text-[#c3a26c]" />
+            <span>Đang tải thông tin tài khoản...</span>
+          </div>
+        ) : (
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {activeTab === 'info' && (
+              <ProfileInfoTab profile={profile} onUpdate={handleUpdateProfile} />
+            )}
+            {activeTab === 'security' && <SecurityTab userId={profile.id} userEmail={profile.email} />}
+            {activeTab === 'activity' && <ActivityTab userId={profile.id} />}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );
