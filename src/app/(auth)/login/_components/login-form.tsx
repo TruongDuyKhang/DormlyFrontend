@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  AlertCircle,
   ArrowRight,
   Eye,
   EyeOff,
@@ -28,8 +29,9 @@ function getErrorMessage(error: unknown) {
 }
 
 export function LoginForm() {
-  const { login } = useAuth();
+  const { login } = useAuth(); // Lấy login từ context
   const [showPassword, setShowPassword] = useState(false);
+  const [bannerError, setBannerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -46,9 +48,15 @@ export function LoginForm() {
   });
 
   const onSubmit = async (values: LoginFormValues) => {
+    setBannerError(null);
     setIsSubmitting(true);
 
     try {
+      // Gọi login từ context - nó sẽ tự xử lý:
+      // 1. Gọi API
+      // 2. Lưu token
+      // 3. Set user state
+      // 4. Redirect (thông qua useEffect trong AuthProvider)
       await login(values.email, values.password);
     } catch (error: unknown) {
       const message = getErrorMessage(error);
@@ -61,6 +69,8 @@ export function LoginForm() {
         lowerMessage.includes("invalid")
       ) {
         setError("password", { type: "server", message });
+      } else {
+        setBannerError(message);
       }
     } finally {
       setIsSubmitting(false);
@@ -69,7 +79,15 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Đã xóa bannerError block */}
+      {bannerError && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-900/15 bg-red-50/80 p-4">
+          <AlertCircle
+            className="mt-0.5 size-5 shrink-0 text-red-700"
+            strokeWidth={1.5}
+          />
+          <p className="text-sm leading-relaxed text-red-800">{bannerError}</p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <label
@@ -144,7 +162,21 @@ export function LoginForm() {
           <p className="text-sm text-red-700">{errors.password.message}</p>
         )}
       </div>
-      
+
+      {/* Demo credentials hint */}
+      <div className="rounded-xl bg-stone-50 p-3 text-center">
+        <p className="text-xs text-stone-500">Demo accounts:</p>
+        <div className="mt-1 flex flex-wrap justify-center gap-3 text-xs">
+          <span className="font-mono text-stone-600">
+            student@gmail.com / student
+          </span>
+          <span className="text-stone-300">|</span>
+          <span className="font-mono text-stone-600">
+            admin@gmail.com / admin1
+          </span>
+        </div>
+      </div>
+
       <button
         type="submit"
         disabled={isSubmitting}
