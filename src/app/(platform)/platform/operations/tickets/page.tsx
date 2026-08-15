@@ -90,22 +90,24 @@ function mapDetailDtoToTicket(dto: TicketDetailResponseDto): Ticket {
   const creationTime = parseDateSecure(dto.createdAt);
 
   const mappedAttachments = (dto.attachments || []).map((att) => {
-    const isImg = /\.(jpg|jpeg|png|gif)$/i.test(att.storedFileName);
-    const isVid = /\.(mp4|webm|ogg)$/i.test(att.storedFileName);
+    const fileName = att.originalFileName || att.storedFileName || 'attachment';
+    const isImg = /\.(jpg|jpeg|png|gif)$/i.test(fileName);
+    const isVid = /\.(mp4|webm|ogg)$/i.test(fileName);
     return {
       id: att.id,
-      fileName: att.fileName,
+      fileName: fileName,
       fileSize: att.fileSize || 0,
-      fileType: isImg ? 'image' : isVid ? 'video' : 'document' as any,
-      fileUrl: ticketService.getAttachmentUrl(att.storedFileName),
+      fileType: isImg ? 'image' : isVid ? 'video' : ('document' as any),
+      fileUrl: ticketService.getAttachmentUrl(att.storedFileName || att.originalFileName),
+      uploadedAt: creationTime,
     };
   });
 
   const mappedComments = (dto.comments || []).map((c) => ({
     id: c.id,
-    authorId: c.userId,
-    authorName: c.fullName || 'Anonymous',
-    authorRole: (c.role?.toLowerCase() as any) || 'student',
+    authorId: c.authorId,
+    authorName: c.authorName || 'Anonymous',
+    authorRole: 'staff' as any,
     content: c.content,
     createdAt: parseDateSecure(c.createdAt),
   }));
@@ -151,7 +153,7 @@ function mapDetailDtoToTicket(dto: TicketDetailResponseDto): Ticket {
     assignedTo: dto.assignees && dto.assignees.length > 0 ? {
       id: dto.assignees[0].userId,
       name: dto.assignees[0].fullName,
-      role: 'manager',
+      role: 'manager' as const,
     } : undefined,
     attachments: mappedAttachments,
     comments: mappedComments,
@@ -361,7 +363,7 @@ export default function TicketsPage() {
             ...ticket,
             priority,
             status: 'assigned' as TicketStatus,
-            assignedTo: { id: assignedToId, name: assignedToName, role: 'manager' },
+            assignedTo: { id: assignedToId, name: assignedToName, role: 'manager' as const },
             assignedBy: { id: currentUser.id, name: currentUser.name },
             deadline,
             updatedAt: new Date().toISOString(),
@@ -455,9 +457,9 @@ export default function TicketsPage() {
       const response = await ticketService.addAdminComment(ticketId, { content: comment });
       const newCommentObj = {
         id: response?.id || `comment-${Date.now()}`,
-        authorId: response?.userId || currentUser.id,
-        authorName: response?.fullName || currentUser.name,
-        authorRole: (response?.role?.toLowerCase() as any) || (currentUser.role as any),
+        authorId: response?.authorId || currentUser.id,
+        authorName: response?.authorName || currentUser.name,
+        authorRole: (currentUser.role as any) || 'admin',
         content: comment,
         createdAt: response?.createdAt || new Date().toISOString(),
       };

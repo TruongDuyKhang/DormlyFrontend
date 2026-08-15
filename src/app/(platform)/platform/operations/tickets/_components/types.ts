@@ -67,6 +67,7 @@ export interface Ticket {
   updatedAt: string;
   completedAt?: string;
   rejectedReason?: string;
+  resolutionNote?: string;
   deadline?: string;
 }
 
