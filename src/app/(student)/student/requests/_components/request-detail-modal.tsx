@@ -42,6 +42,7 @@ const categoryConfig: Record<
   MAINTENANCE: { label: "Maintenance", color: "bg-sky-600 text-white" },
   FACILITY: { label: "Facility", color: "bg-teal-600 text-white" },
   ROOMMATE: { label: "Roommate", color: "bg-amber-600 text-white" },
+  TRANSFER: { label: "Room Transfer", color: "bg-indigo-600 text-white" },
   SECURITY: { label: "Security", color: "bg-red-600 text-white" },
   BILLING: { label: "Billing", color: "bg-violet-600 text-white" },
   OTHER: { label: "Other", color: "bg-stone-500 text-white" },

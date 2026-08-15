@@ -37,26 +37,37 @@ export default function ProfilePage() {
       const stored = localStorage.getItem('session.user') || localStorage.getItem('user');
       const sessionObj = stored ? JSON.parse(stored) : null;
 
-      let userId = sessionObj?.id || decoded?.id;
       let userData: any = null;
-
-      if (userId) {
-        try {
-          userData = await userService.getById(userId);
-        } catch {
-          // If direct ID lookup fails, fallback to session data
+      try {
+        userData = await userService.getMe();
+      } catch {
+        let userId = sessionObj?.id || decoded?.id;
+        if (userId) {
+          try {
+            userData = await userService.getById(userId);
+          } catch {
+            // Fallback to session data
+          }
         }
       }
 
+      const userId = userData?.id || sessionObj?.id || decoded?.id || '';
       const name = userData?.fullName || sessionObj?.fullName || decoded?.fullname || 'Administrator';
       const email = userData?.email || sessionObj?.email || decoded?.email || 'admin@dormly.com';
       const phone = userData?.phoneNumber || sessionObj?.phoneNumber || '0901234567';
       const avatar = userData?.avatar || sessionObj?.avatar || '';
       
       const rolesArray = userData?.roles || sessionObj?.roles || decoded?.roles;
-      const roleStr = Array.isArray(rolesArray) && rolesArray.length > 0
-        ? rolesArray[0]?.replace('ROLE_', '')
-        : 'Administrator';
+      let fullRoleStr = 'Administrator';
+      if (Array.isArray(rolesArray) && rolesArray.length > 0) {
+        fullRoleStr = rolesArray
+          .map((r: any) => {
+            const raw = typeof r === 'string' ? r : (r.name || String(r));
+            const cleaned = raw.replace(/^ROLE_/, '');
+            return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+          })
+          .join(', ');
+      }
 
       const createdAt = userData?.createdAt || sessionObj?.createdAt;
       const joinDate = createdAt
@@ -64,12 +75,12 @@ export default function ProfilePage() {
         : 'Tháng 8, 2026';
 
       setProfile({
-        id: userId || '',
+        id: userId,
         name,
         email,
         phone,
         location: 'Hồ Chí Minh, Việt Nam',
-        role: roleStr.charAt(0).toUpperCase() + roleStr.slice(1).toLowerCase(),
+        role: fullRoleStr,
         joinDate,
         bio: 'Ban Quản trị Hệ thống Ký túc xá Sinh viên Dormly.',
         avatar,

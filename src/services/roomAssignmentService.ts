@@ -75,6 +75,15 @@ export const roomAssignmentService = {
   },
 
   /**
+   * Move out student from active room assignment
+   */
+  async moveOut(userId: string): Promise<void> {
+    await api.post<ApiResponse<void>>("/api/room-assignments/move-out", null, {
+      params: { userId },
+    });
+  },
+
+  /**
    * Assign room automatically based on algorithm & preferences
    */
   async assignAuto(params: {

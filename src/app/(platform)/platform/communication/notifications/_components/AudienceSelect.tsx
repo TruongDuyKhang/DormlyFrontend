@@ -2,10 +2,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Users, Building2, Layers, DoorOpen, X } from 'lucide-react';
+import { ChevronDown, Users, Building2, Layers, DoorOpen, User, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AudienceFilter, Block } from './types';
 import { blocks } from './mockData';
+import { userService } from '@/services/userService';
+import type { UserResponseDto } from '@/types/models';
 
 interface AudienceSelectProps {
   value: AudienceFilter;
@@ -17,6 +19,7 @@ const audienceTypes = [
   { value: 'block', label: 'Specific Block', icon: Building2, description: 'Select a block' },
   { value: 'floor', label: 'Specific Floor', icon: Layers, description: 'Select a block and floor' },
   { value: 'room', label: 'Specific Room', icon: DoorOpen, description: 'Select a block, floor, and room' },
+  { value: 'user', label: 'Specific Resident', icon: User, description: 'Send to a specific resident' },
 ];
 
 // Custom Select Component
@@ -84,6 +87,14 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
   const [selectedBlock, setSelectedBlock] = useState<string>('');
   const [selectedFloor, setSelectedFloor] = useState<number>(1);
   const [selectedRoom, setSelectedRoom] = useState<string>('');
+  const [userList, setUserList] = useState<UserResponseDto[]>([]);
+  const [customEmail, setCustomEmail] = useState<string>('');
+
+  useEffect(() => {
+    userService.list()
+      .then((users) => setUserList(users || []))
+      .catch(() => {});
+  }, []);
   
   const currentType = audienceTypes.find(t => t.value === value.type);
   const CurrentIcon = currentType?.icon;
@@ -99,6 +110,9 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
       case 'room': {
         const [block, floor, room] = (value.value || '').split('-');
         return `Block ${block?.toUpperCase()} • Floor ${floor} • Room ${room}`;
+      }
+      case 'user': {
+        return value.value ? `Resident Email: ${value.value}` : 'Select specific resident';
       }
       default: return 'Select audience';
     }
@@ -119,6 +133,10 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
       setSelectedBlock(blocks[0]?.id);
       setSelectedFloor(1);
       setSelectedRoom('101');
+    } else if (type === 'user') {
+      const defaultEmail = userList[0]?.email || '';
+      onChange({ type: 'user', value: defaultEmail });
+      setCustomEmail(defaultEmail);
     }
   };
   
@@ -146,6 +164,11 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
     setSelectedRoom(room);
     onChange({ type: 'room', value: `${selectedBlock}-${selectedFloor}-${room}` });
   };
+
+  const handleUserSelect = (userEmail: string) => {
+    setCustomEmail(userEmail);
+    onChange({ type: 'user', value: userEmail });
+  };
   
   const selectedBlockObj = blocks.find(b => b.id === selectedBlock);
   
@@ -155,11 +178,16 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
     const roomNumber = roomNum.toString().padStart(2, '0');
     return { value: roomNumber, label: `Room ${roomNumber}` };
   });
+
+  const userOptions = userList.map((u) => ({
+    value: u.email,
+    label: `${u.fullName} (${u.email})`,
+  }));
   
   return (
     <div className="space-y-3">
       {/* Audience Type Selector */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {audienceTypes.map((type) => {
           const Icon = type.icon;
           const isSelected = value.type === type.value;
@@ -168,14 +196,14 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
               key={type.value}
               onClick={() => handleTypeChange(type.value)}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition-all",
+                "flex flex-col items-center gap-1 rounded-xl border p-2.5 text-center transition-all",
                 isSelected
                   ? "border-[#c3a26c] bg-[#c3a26c]/10 text-[#c3a26c]"
                   : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-xs font-medium">{type.label}</span>
+              <Icon className="h-4 w-4" />
+              <span className="text-[11px] font-medium leading-tight">{type.label}</span>
             </button>
           );
         })}
@@ -222,6 +250,31 @@ export function AudienceSelect({ value, onChange }: AudienceSelectProps) {
                 options={roomOptions}
                 placeholder="Select room"
               />
+            </div>
+          )}
+
+          {value.type === 'user' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-stone-500 block mb-1">Select Resident</label>
+                <CustomSelect
+                  value={customEmail}
+                  onChange={handleUserSelect}
+                  options={userOptions}
+                  placeholder="Select resident student"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-stone-500 block mb-1">Or Enter Resident Email</label>
+                <input
+                  type="email"
+                  value={customEmail}
+                  onChange={(e) => handleUserSelect(e.target.value)}
+                  placeholder="e.g. student@dormly.edu"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+                />
+              </div>
             </div>
           )}
         </div>

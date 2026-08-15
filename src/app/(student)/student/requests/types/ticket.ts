@@ -4,6 +4,7 @@ export type TicketCategory =
   | "ROOMMATE"
   | "SECURITY"
   | "BILLING"
+  | "TRANSFER"
   | "OTHER";
 
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

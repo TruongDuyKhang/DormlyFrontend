@@ -15,7 +15,9 @@ import { roomAssignmentService } from '@/services/roomAssignmentService';
 import { buildingService } from '@/services/buildingService';
 import { studentProfileService } from '@/services/studentProfileService';
 import { userService } from '@/services/userService';
+import { userDocumentService } from '@/services/userDocumentService';
 import type { UserResponseDto, BuildingNodeResponseDto, StudentProfileResponseDto } from '@/types/models';
+import { toast } from 'sonner';
 
 export default function AssignmentsPage() {
   const [activeTab, setActiveTab] = useState<AssignmentTabType>('pending');
@@ -35,17 +37,19 @@ export default function AssignmentsPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [assignmentsRes, profilesRes, usersRes, nodesRes] = await Promise.allSettled([
+      const [assignmentsRes, profilesRes, usersRes, nodesRes, groupedDocsRes] = await Promise.allSettled([
         roomAssignmentService.list(),
         studentProfileService.listAllProfiles(),
         userService.list(),
         buildingService.listNodes(),
+        userDocumentService.listGroupedByUserId(),
       ]);
 
       const users: UserResponseDto[] = usersRes.status === 'fulfilled' && usersRes.value ? usersRes.value : [];
       const profiles: StudentProfileResponseDto[] = profilesRes.status === 'fulfilled' && profilesRes.value ? profilesRes.value : [];
       const assignments = assignmentsRes.status === 'fulfilled' && assignmentsRes.value ? assignmentsRes.value : [];
       const nodes: BuildingNodeResponseDto[] = nodesRes.status === 'fulfilled' && nodesRes.value ? nodesRes.value : [];
+      const groupedDocs = groupedDocsRes.status === 'fulfilled' && groupedDocsRes.value ? groupedDocsRes.value : {};
 
       // Map building nodes for room/floor/block hierarchy
       const nodeMap = new Map<string, BuildingNodeResponseDto>();
@@ -105,21 +109,15 @@ export default function AssignmentsPage() {
       const userMap = new Map<string, UserResponseDto>();
       users.forEach((u) => userMap.set(u.id, u));
 
-      // Profile map by index or studentCode
-      const profileMap = new Map<string, StudentProfileResponseDto>();
-      profiles.forEach((p) => {
-        if (p.studentCode) profileMap.set(p.studentCode, p);
-        if (p.id) profileMap.set(p.id, p);
-      });
-
       const loadedAssigned: StudentAssignment[] = [];
       const loadedPending: StudentAssignment[] = [];
+      const loadedRejected: StudentAssignment[] = [];
 
       // Process assignments first
       assignments.forEach((asg, idx) => {
         const u = userMap.get(asg.userId);
         const roomObj = rooms.find((r) => r.id === asg.roomNodeId);
-        const prof = profiles[idx] || undefined;
+        const prof = profiles.find((p) => p.id === asg.userId || (u && p.studentCode?.includes(u.email.split('@')[0])));
 
         loadedAssigned.push({
           id: asg.userId,
@@ -131,7 +129,7 @@ export default function AssignmentsPage() {
           startYear: prof?.startYear?.toString() || '2022',
           endYear: prof?.endYear?.toString() || '2026',
           major: prof?.major || 'Information Technology',
-          year: '2nd Year',
+          year: prof?.startYear ? `${new Date().getFullYear() - prof.startYear + 1}th Year` : '2nd Year',
           faculty: 'Faculty of Engineering',
           sleepTime: prof?.sleepTime || '23:00',
           wakeUpTime: prof?.wakeUpTime || '06:30',
@@ -140,7 +138,12 @@ export default function AssignmentsPage() {
           studyHabit: 'Self Study',
           routineStrictness: 'Strict',
           adaptability: 'High',
-          preference: 'system',
+          preference: prof?.roommatePreference === 'friend' ? 'friend' : 'system',
+          friendName: prof?.friendName,
+          friendId: prof?.friendStudentId,
+          friendBlock: prof?.friendBlock,
+          friendFloor: prof?.friendFloor,
+          friendRoom: prof?.friendRoom,
           documents: { citizenId: true, studentCard: true },
           status: 'assigned',
           assignedRoom: roomObj?.roomNumber || asg.roomNodeId,
@@ -150,12 +153,17 @@ export default function AssignmentsPage() {
         });
       });
 
-      // Process all users that are not assigned as pending applicants
+      // Process all users that are not assigned as pending/rejected applicants
       users.forEach((u, idx) => {
         if (!assignmentMap.has(u.id)) {
           const prof = profiles.find((p) => p.id === u.id || p.studentCode?.includes(u.email.split('@')[0])) || profiles[idx % (profiles.length || 1)];
+          const userDocs = groupedDocs[u.id] || [];
+          
+          const isCitizenIdApproved = userDocs.some(d => d.documentType === 'CCCD_FRONT' && d.status === 'APPROVED');
+          const isStudentCardApproved = userDocs.some(d => d.documentType === 'STUDENT_CARD' && d.status === 'APPROVED');
+          const rejectedDoc = userDocs.find(d => d.status === 'REJECTED');
 
-          loadedPending.push({
+          const studentObj: StudentAssignment = {
             id: u.id,
             name: u.fullName || `Student Applicant ${idx + 1}`,
             studentId: prof?.studentCode || `SV202${idx + 1}00${idx + 1}`,
@@ -174,35 +182,50 @@ export default function AssignmentsPage() {
             studyHabit: 'Group Study',
             routineStrictness: 'Moderate',
             adaptability: 'High',
-            preference: prof?.friendName ? 'friend' : 'system',
+            preference: prof?.roommatePreference === 'friend' ? 'friend' : 'system',
             friendName: prof?.friendName,
             friendId: prof?.friendStudentId,
             friendBlock: prof?.friendBlock,
             friendFloor: prof?.friendFloor,
             friendRoom: prof?.friendRoom,
-            documents: { citizenId: true, studentCard: true },
-            status: 'pending',
+            documents: { citizenId: isCitizenIdApproved, studentCard: isStudentCardApproved },
+            status: rejectedDoc ? 'rejected' : 'pending',
+            rejectionReason: rejectedDoc?.rejectReason,
             createdAt: u.createdAt || new Date().toISOString(),
-          });
+          };
+
+          if (rejectedDoc) {
+            loadedRejected.push(studentObj);
+          } else {
+            loadedPending.push(studentObj);
+          }
         }
       });
 
       // If profiles exist without matching user entries, add them as well
       profiles.forEach((p, idx) => {
         const alreadyIncluded = loadedPending.some((s) => s.id === p.id || s.studentId === p.studentCode) ||
-                               loadedAssigned.some((s) => s.id === p.id || s.studentId === p.studentCode);
-        if (!alreadyIncluded) {
-          loadedPending.push({
-            id: p.id || `prof-${idx}`,
-            name: p.friendName || `Student Candidate ${idx + 1}`,
+                               loadedAssigned.some((s) => s.id === p.id || s.studentId === p.studentCode) ||
+                               loadedRejected.some((s) => s.id === p.id || s.studentId === p.studentCode);
+        if (!alreadyIncluded && p.id) {
+          const u = userMap.get(p.id);
+          const userDocs = groupedDocs[p.id] || [];
+          
+          const isCitizenIdApproved = userDocs.some(d => d.documentType === 'CCCD_FRONT' && d.status === 'APPROVED');
+          const isStudentCardApproved = userDocs.some(d => d.documentType === 'STUDENT_CARD' && d.status === 'APPROVED');
+          const rejectedDoc = userDocs.find(d => d.status === 'REJECTED');
+
+          const studentObj: StudentAssignment = {
+            id: p.id,
+            name: u?.fullName || p.friendName || `Student Candidate ${idx + 1}`,
             studentId: p.studentCode || `SV20240${idx + 1}`,
-            email: `candidate${idx + 1}@dormly.edu`,
-            phone: '0934567890',
-            dateOfBirth: '2003-07-22',
+            email: u?.email || `candidate${idx + 1}@dormly.edu`,
+            phone: u?.phoneNumber || '0934567890',
+            dateOfBirth: u?.dateOfBirth || '2003-07-22',
             startYear: p.startYear?.toString() || '2023',
             endYear: p.endYear?.toString() || '2027',
             major: p.major || 'Accounting',
-            year: '1st Year',
+            year: p.startYear ? `${new Date().getFullYear() - p.startYear + 1}th Year` : '1st Year',
             faculty: 'Business Administration',
             sleepTime: p.sleepTime || '22:30',
             wakeUpTime: p.wakeUpTime || '06:00',
@@ -211,23 +234,32 @@ export default function AssignmentsPage() {
             studyHabit: 'Self Study',
             routineStrictness: 'Strict',
             adaptability: 'High',
-            preference: p.friendName ? 'friend' : 'system',
+            preference: p.roommatePreference === 'friend' ? 'friend' : 'system',
             friendName: p.friendName,
             friendId: p.friendStudentId,
             friendBlock: p.friendBlock,
             friendFloor: p.friendFloor,
             friendRoom: p.friendRoom,
-            documents: { citizenId: true, studentCard: true },
-            status: 'pending',
+            documents: { citizenId: isCitizenIdApproved, studentCard: isStudentCardApproved },
+            status: rejectedDoc ? 'rejected' : 'pending',
+            rejectionReason: rejectedDoc?.rejectReason,
             createdAt: p.createdAt || new Date().toISOString(),
-          });
+          };
+
+          if (rejectedDoc) {
+            loadedRejected.push(studentObj);
+          } else {
+            loadedPending.push(studentObj);
+          }
         }
       });
 
       setAssignedList(loadedAssigned);
       setPendingList(loadedPending);
+      setRejectedList(loadedRejected);
     } catch (err) {
       console.error('Error fetching assignments data from API:', err);
+      toast.error('Lỗi khi đồng bộ dữ liệu xếp phòng');
     } finally {
       setIsLoading(false);
     }
@@ -242,46 +274,39 @@ export default function AssignmentsPage() {
       return rejectedList;
     }
     if (activeTab === 'all') {
-      return [...pendingList.filter((s) => s.status === 'pending'), ...assignedList, ...rejectedList];
+      return [...pendingList, ...assignedList, ...rejectedList];
     }
-    return pendingList.filter((s) => s.status === 'pending');
+    return pendingList;
   };
 
   const filteredStudents = getFilteredStudents();
 
   const counts = {
-    pending: pendingList.filter((s) => s.status === 'pending').length,
+    pending: pendingList.length,
     rejected: rejectedList.length,
-    all: pendingList.filter((s) => s.status === 'pending').length + assignedList.length + rejectedList.length,
+    all: pendingList.length + assignedList.length + rejectedList.length,
   };
 
   const handleAutoAssign = async (studentId: string) => {
     const student = pendingList.find((s) => s.id === studentId);
     if (!student) return;
 
+    setIsProcessing(true);
     try {
-      await roomAssignmentService
-        .assignAuto({
-          userId: studentId,
-          startDate: new Date().toISOString(),
-        })
-        .catch(() => {});
-    } catch (e) {
-      console.warn('API auto assign notice:', e);
+      await roomAssignmentService.assignAuto({
+        userId: studentId,
+        startDate: new Date().toISOString(),
+      });
+      toast.success(`Xếp phòng tự động thành công cho sinh viên ${student.name}`);
+      await loadData();
+      setExpandedId(null);
+    } catch (e: any) {
+      console.error('Auto assign error:', e);
+      const errMsg = e.response?.data?.message || e.message || 'Lỗi không mong muốn xảy ra';
+      toast.error(`Lỗi xếp phòng tự động: ${errMsg}`);
+    } finally {
+      setIsProcessing(false);
     }
-
-    const room = availableRoomsList.find((r) => r.availableSlots > 0);
-    const assignedStudent: StudentAssignment = {
-      ...student,
-      status: 'assigned',
-      assignedRoom: room?.roomNumber || 'A101',
-      assignedBlock: room?.block || 'Tòa A',
-      assignedFloor: room?.floor || 1,
-    };
-
-    setPendingList((prev) => prev.filter((s) => s.id !== studentId));
-    setAssignedList((prev) => [...prev, assignedStudent]);
-    setExpandedId(null);
   };
 
   const handleManualAssign = (student: StudentAssignment) => {
@@ -293,77 +318,85 @@ export default function AssignmentsPage() {
     const student = pendingList.find((s) => s.id === studentId);
     if (!student) return;
 
-    const room = availableRoomsList.find((r) => r.id === roomId);
-
+    setIsProcessing(true);
     try {
-      await roomAssignmentService
-        .assignManual({
-          userId: studentId,
-          roomNodeId: roomId,
-          startDate: new Date().toISOString(),
-        })
-        .catch(() => {});
-    } catch (e) {
-      console.warn('API manual assign notice:', e);
+      await roomAssignmentService.assignManual({
+        userId: studentId,
+        roomNodeId: roomId,
+        startDate: new Date().toISOString(),
+      });
+
+      toast.success(`Xếp phòng thủ công thành công cho sinh viên ${student.name}`);
+      await loadData();
+      setShowManualAssignModal(false);
+      setSelectedStudent(null);
+      setExpandedId(null);
+    } catch (e: any) {
+      console.error('Manual assign error:', e);
+      const errMsg = e.response?.data?.message || e.message || 'Lỗi không mong muốn xảy ra';
+      toast.error(`Lỗi xếp phòng thủ công: ${errMsg}`);
+    } finally {
+      setIsProcessing(false);
     }
-
-    const assignedStudent: StudentAssignment = {
-      ...student,
-      status: 'assigned',
-      assignedRoom: room?.roomNumber || 'A101',
-      assignedBlock: room?.block || 'Tòa A',
-      assignedFloor: room?.floor || 1,
-    };
-
-    setPendingList((prev) => prev.filter((s) => s.id !== studentId));
-    setAssignedList((prev) => [...prev, assignedStudent]);
-    setShowManualAssignModal(false);
-    setSelectedStudent(null);
-    setExpandedId(null);
   };
 
-  const handleReject = (studentId: string) => {
-    const student = pendingList.find((s) => s.id === studentId);
-    if (!student) return;
-
-    setPendingList((prev) => prev.filter((s) => s.id !== studentId));
-    setRejectedList((prev) => [...prev, { ...student, status: 'rejected' }]);
-    setExpandedId(null);
+  const handleReject = async (studentId: string, reason: string) => {
+    setIsProcessing(true);
+    try {
+      const docs = await userDocumentService.getDocumentsByUserId(studentId);
+      if (docs.length > 0) {
+        await Promise.all(
+          docs.map((doc) =>
+            userDocumentService.setDocumentStatus(doc.id, {
+              status: 'REJECTED' as any,
+              rejectReason: reason || 'Từ chối xếp phòng bởi Admin',
+            })
+          )
+        );
+      }
+      toast.success('Từ chối xếp phòng thành công');
+      await loadData();
+      setExpandedId(null);
+    } catch (e: any) {
+      console.error('Reject assignment error:', e);
+      toast.error('Lỗi khi thực hiện từ chối đơn gán phòng');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleConfirmAutoAssignAll = async (students: StudentAssignment[]) => {
     setIsProcessing(true);
+    let successCount = 0;
+    let failCount = 0;
 
     for (const student of students) {
       try {
-        await roomAssignmentService
-          .assignAuto({
-            userId: student.id,
-            startDate: new Date().toISOString(),
-          })
-          .catch(() => {});
-      } catch (e) {
-        console.warn(e);
+        await roomAssignmentService.assignAuto({
+          userId: student.id,
+          startDate: new Date().toISOString(),
+        });
+        successCount++;
+      } catch (e: any) {
+        console.error(`Auto assign failed for ${student.name}:`, e);
+        failCount++;
       }
-
-      const room = availableRoomsList.find((r) => r.availableSlots > 0);
-      const assignedStudent: StudentAssignment = {
-        ...student,
-        status: 'assigned',
-        assignedRoom: room?.roomNumber || 'A101',
-        assignedBlock: room?.block || 'Tòa A',
-        assignedFloor: room?.floor || 1,
-      };
-      setAssignedList((prev) => [...prev, assignedStudent]);
-      setPendingList((prev) => prev.filter((s) => s.id !== student.id));
     }
 
+    if (successCount > 0) {
+      toast.success(`Đã tự động xếp phòng thành công cho ${successCount} sinh viên`);
+    }
+    if (failCount > 0) {
+      toast.error(`Xếp phòng thất bại cho ${failCount} sinh viên`);
+    }
+
+    await loadData();
     setIsProcessing(false);
     setShowAutoAssignModal(false);
     setExpandedId(null);
   };
 
-  const totalPending = pendingList.filter((s) => s.status === 'pending').length;
+  const totalPending = pendingList.length;
   const showActions = activeTab === 'pending';
 
   return (
@@ -391,14 +424,14 @@ export default function AssignmentsPage() {
                 Assign Rooms
               </h1>
               <p className="mt-2 text-sm text-stone-600">
-                Review student preferences and assign rooms directly with backend algorithms.
+                Xếp phòng cho sinh viên tự động bằng thuật toán tương đồng tính cách và sở thích sinh hoạt hoặc thủ công.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={loadData}
-                className="flex items-center gap-1.5 rounded-xl border border-white/60 bg-white/40 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-white/60 transition"
+                className="flex items-center gap-1.5 rounded-xl border border-white/60 bg-white/40 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-white/60 transition shadow-sm"
               >
                 <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
                 Sync API Data
@@ -416,7 +449,7 @@ export default function AssignmentsPage() {
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-stone-500 gap-2">
               <Loader2 className="h-5 w-5 animate-spin text-[#c3a26c]" />
-              <span>Fetching assignment records from API...</span>
+              <span>Đang tải thông tin xếp phòng từ máy chủ...</span>
             </div>
           ) : (
             <AnimatePresence mode="wait">
@@ -448,9 +481,7 @@ export default function AssignmentsPage() {
                       <Sparkles className="h-10 w-10 text-stone-400" />
                     </div>
                     <p className="text-sm font-medium text-stone-600">
-                      {activeTab === 'pending' && 'No pending student applications in backend'}
-                      {activeTab === 'rejected' && 'No rejected applications'}
-                      {activeTab === 'all' && 'No student records found in API'}
+                      Không có sinh viên nào trong danh sách.
                     </p>
                   </div>
                 )}
@@ -460,17 +491,17 @@ export default function AssignmentsPage() {
         </div>
       </motion.div>
 
-      {/* Auto Assign Modal */}
+      {/* Auto Assign Dialog */}
       <AutoAssignModal
         isOpen={showAutoAssignModal}
         onClose={() => setShowAutoAssignModal(false)}
-        students={pendingList.filter((s) => s.status === 'pending')}
+        students={pendingList}
         rooms={availableRoomsList}
         onConfirm={handleConfirmAutoAssignAll}
         isProcessing={isProcessing}
       />
 
-      {/* Manual Assign Modal */}
+      {/* Manual Assign Dialog */}
       <ManualAssignModal
         isOpen={showManualAssignModal}
         onClose={() => {

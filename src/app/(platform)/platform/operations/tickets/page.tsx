@@ -10,9 +10,19 @@ import { StatusCards } from './_components/StatusCards';
 import { TicketsListView } from './_components/TicketsListView';
 import { TicketDetailModal } from './_components/TicketDetailModal';
 import { ticketService } from '@/services/ticketService';
-import type { TicketSummaryResponseDto } from '@/types/models';
+import { userService } from '@/services/userService';
+import { useAuth } from '@/app/(auth)/context/auth-context';
+import type { TicketSummaryResponseDto, TicketDetailResponseDto } from '@/types/models';
+import { toast } from 'sonner';
 
-const currentUser = { id: 'admin-1', name: 'System Admin', role: 'admin' };
+function parseDateSecure(dateStr: string | null | undefined): string {
+  if (!dateStr) return new Date().toISOString();
+  let s = dateStr;
+  if (!s.includes('Z') && !s.includes('+')) {
+    s = s + 'Z';
+  }
+  return new Date(s).toISOString();
+}
 
 function mapDtoToTicket(dto: TicketSummaryResponseDto): Ticket {
   let status: TicketStatus = 'pending';
@@ -25,10 +35,12 @@ function mapDtoToTicket(dto: TicketSummaryResponseDto): Ticket {
   if (dto.priority === 'CRITICAL' || dto.priority === 'HIGH') priority = 'high';
   else if (dto.priority === 'LOW') priority = 'low';
 
+  const creationTime = parseDateSecure(dto.createdAt);
+
   return {
     id: dto.id,
     title: dto.title || 'Untitled Ticket',
-    description: dto.title || '',
+    description: '',
     category: (dto.category?.toLowerCase() as any) || 'other',
     priority,
     status,
@@ -55,20 +67,110 @@ function mapDtoToTicket(dto: TicketSummaryResponseDto): Ticket {
         description: 'Ticket submitted into system',
         author: dto.reporterName || 'Resident',
         authorRole: 'student',
-        timestamp: dto.createdAt,
+        timestamp: creationTime,
       },
     ],
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt || dto.createdAt,
-    deadline: dto.dueDate,
+    createdAt: creationTime,
+    updatedAt: parseDateSecure(dto.createdAt),
+    deadline: dto.dueDate ? parseDateSecure(dto.dueDate) : undefined,
+  };
+}
+
+function mapDetailDtoToTicket(dto: TicketDetailResponseDto): Ticket {
+  let status: TicketStatus = 'pending';
+  if (dto.status === 'OPEN') status = 'pending';
+  else if (dto.status === 'IN_PROGRESS') status = 'in_progress';
+  else if (dto.status === 'RESOLVED') status = 'done';
+  else if (dto.status === 'CLOSED') status = 'rejected';
+
+  let priority: TicketPriority = 'medium';
+  if (dto.priority === 'CRITICAL' || dto.priority === 'HIGH') priority = 'high';
+  else if (dto.priority === 'LOW') priority = 'low';
+
+  const creationTime = parseDateSecure(dto.createdAt);
+
+  const mappedAttachments = (dto.attachments || []).map((att) => {
+    const isImg = /\.(jpg|jpeg|png|gif)$/i.test(att.storedFileName);
+    const isVid = /\.(mp4|webm|ogg)$/i.test(att.storedFileName);
+    return {
+      id: att.id,
+      fileName: att.fileName,
+      fileSize: att.fileSize || 0,
+      fileType: isImg ? 'image' : isVid ? 'video' : 'document' as any,
+      fileUrl: ticketService.getAttachmentUrl(att.storedFileName),
+    };
+  });
+
+  const mappedComments = (dto.comments || []).map((c) => ({
+    id: c.id,
+    authorId: c.userId,
+    authorName: c.fullName || 'Anonymous',
+    authorRole: (c.role?.toLowerCase() as any) || 'student',
+    content: c.content,
+    createdAt: parseDateSecure(c.createdAt),
+  }));
+
+  const timeline = [
+    {
+      id: `t-created-${dto.id}`,
+      action: 'Ticket Created',
+      description: 'Ticket submitted into system',
+      author: dto.reporterName || 'Resident',
+      authorRole: 'student',
+      timestamp: creationTime,
+    }
+  ];
+
+  if (dto.resolvedAt) {
+    timeline.push({
+      id: `t-resolved-${dto.id}`,
+      action: 'Ticket Resolved',
+      description: dto.resolutionNote || 'Ticket was resolved',
+      author: 'Staff',
+      authorRole: 'manager',
+      timestamp: parseDateSecure(dto.resolvedAt),
+    });
+  }
+
+  return {
+    id: dto.id,
+    title: dto.title || 'Untitled Ticket',
+    description: dto.description || '',
+    category: (dto.category?.toLowerCase() as any) || 'other',
+    priority,
+    status,
+    blockId: 'b-1',
+    blockName: dto.buildingNodeName || 'Building A',
+    floorLevel: 1,
+    roomNumber: dto.buildingNodeName || 'Room 101',
+    createdBy: {
+      id: dto.reporterId || 'resident',
+      name: dto.reporterName || 'Resident',
+      studentId: dto.reporterName || 'STU001',
+    },
+    assignedTo: dto.assignees && dto.assignees.length > 0 ? {
+      id: dto.assignees[0].userId,
+      name: dto.assignees[0].fullName,
+      role: 'manager',
+    } : undefined,
+    attachments: mappedAttachments,
+    comments: mappedComments,
+    timeline,
+    createdAt: creationTime,
+    updatedAt: parseDateSecure(dto.createdAt),
+    deadline: dto.dueDate ? parseDateSecure(dto.dueDate) : undefined,
+    resolutionNote: dto.resolutionNote,
+    rejectedReason: dto.status === 'CLOSED' ? dto.resolutionNote : undefined,
   };
 }
 
 export default function TicketsPage() {
+  const { user: authUser } = useAuth();
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(''); // '' = all tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<FilterOptions>({
     blockId: '',
@@ -81,16 +183,34 @@ export default function TicketsPage() {
     dateTo: '',
   });
 
+  const currentUser = useMemo(() => {
+    if (!authUser) return { id: 'admin-1', name: 'System Admin', role: 'admin' };
+    const normalized = (authUser.roles || []).map((r) => r.toLowerCase().replace("role_", ""));
+    const isAdm = normalized.some((r) => ["admin", "manager"].includes(r));
+    return {
+      id: authUser.id,
+      name: authUser.fullname || 'Staff User',
+      role: isAdm ? 'admin' : 'staff',
+    };
+  }, [authUser]);
+
   const loadTickets = useCallback(async () => {
     setIsLoading(true);
     try {
-      const pageResult = await ticketService.listTickets({ size: 100 });
-      if (pageResult && pageResult.content) {
-        const mapped = pageResult.content.map(mapDtoToTicket);
+      const [pageResult, allUsers] = await Promise.allSettled([
+        ticketService.listTickets({ size: 100 }),
+        userService.list(),
+      ]);
+      
+      if (pageResult.status === 'fulfilled' && pageResult.value?.content) {
+        const mapped = pageResult.value.content.map(mapDtoToTicket);
         setTickets(mapped);
       }
+      if (allUsers.status === 'fulfilled' && allUsers.value) {
+        setUsersList(allUsers.value);
+      }
     } catch (err) {
-      console.error('Failed to load tickets from backend API:', err);
+      console.error('Failed to load tickets/users from backend API:', err);
     } finally {
       setIsLoading(false);
     }
@@ -100,16 +220,25 @@ export default function TicketsPage() {
     loadTickets();
   }, [loadTickets]);
 
+  const handleTicketClick = async (ticket: Ticket) => {
+    try {
+      const details = await ticketService.getTicketDetail(ticket.id);
+      const fullTicket = mapDetailDtoToTicket(details);
+      setSelectedTicket(fullTicket);
+    } catch (e) {
+      console.error("Failed to load ticket details:", e);
+      setSelectedTicket(ticket);
+    }
+  };
+
   // Filter tickets
   const filteredTickets = useMemo(() => {
     let filtered = [...tickets];
 
-    // Status filter from cards
     if (statusFilter) {
       filtered = filtered.filter((ticket) => ticket.status === statusFilter);
     }
 
-    // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -122,37 +251,30 @@ export default function TicketsPage() {
       );
     }
 
-    // Block filter
     if (filters.blockId) {
       filtered = filtered.filter((ticket) => ticket.blockId === filters.blockId);
     }
 
-    // Floor filter
     if (filters.floorLevel) {
       filtered = filtered.filter((ticket) => ticket.floorLevel === parseInt(filters.floorLevel));
     }
 
-    // Room filter
     if (filters.roomNumber) {
       filtered = filtered.filter((ticket) => ticket.roomNumber.includes(filters.roomNumber));
     }
 
-    // Category filter
     if (filters.category) {
       filtered = filtered.filter((ticket) => ticket.category === filters.category);
     }
 
-    // Priority filter
     if (filters.priority) {
       filtered = filtered.filter((ticket) => ticket.priority === filters.priority);
     }
 
-    // Status filter from filters
     if (filters.status && !statusFilter) {
       filtered = filtered.filter((ticket) => ticket.status === filters.status);
     }
 
-    // Date range filter
     if (filters.dateFrom) {
       const fromDate = new Date(filters.dateFrom);
       filtered = filtered.filter((ticket) => new Date(ticket.createdAt) >= fromDate);
@@ -166,7 +288,6 @@ export default function TicketsPage() {
     return filtered;
   }, [tickets, searchQuery, filters, statusFilter]);
 
-  // Handle status card click
   const handleStatusCardClick = (status: string) => {
     if (statusFilter === status) {
       setStatusFilter('');
@@ -176,7 +297,6 @@ export default function TicketsPage() {
     }
   };
 
-  // Clear all filters
   const clearAllFilters = () => {
     setStatusFilter('');
     setSearchQuery('');
@@ -212,7 +332,6 @@ export default function TicketsPage() {
     }
   };
 
-  // Handle update ticket
   const handleUpdateTicket = async (
     ticketId: string,
     priority: TicketPriority,
@@ -238,7 +357,7 @@ export default function TicketsPage() {
     setTickets((prev) =>
       prev.map((ticket) => {
         if (ticket.id === ticketId) {
-          return {
+          const updated = {
             ...ticket,
             priority,
             status: 'assigned' as TicketStatus,
@@ -247,13 +366,14 @@ export default function TicketsPage() {
             deadline,
             updatedAt: new Date().toISOString(),
           };
+          setSelectedTicket((curr) => curr && curr.id === ticketId ? { ...curr, ...updated } : curr);
+          return updated;
         }
         return ticket;
       })
     );
   };
 
-  // Handle start work
   const handleStartWork = async (ticketId: string) => {
     try {
       await ticketService.updateStatus(ticketId, { status: 'IN_PROGRESS' }).catch(() => {});
@@ -264,41 +384,47 @@ export default function TicketsPage() {
     setTickets((prev) =>
       prev.map((ticket) => {
         if (ticket.id === ticketId) {
-          return {
+          const updated = {
             ...ticket,
             status: 'in_progress' as TicketStatus,
             updatedAt: new Date().toISOString(),
           };
+          setSelectedTicket((curr) => curr && curr.id === ticketId ? { ...curr, ...updated } : curr);
+          return updated;
         }
         return ticket;
       })
     );
   };
 
-  // Handle complete ticket
-  const handleComplete = async (ticketId: string) => {
+  const handleComplete = async (ticketId: string, resolutionNote?: string) => {
     try {
-      await ticketService.updateStatus(ticketId, { status: 'RESOLVED' }).catch(() => {});
-    } catch (e) {
-      console.warn(e);
-    }
+      const note = resolutionNote?.trim() || 'Đã hoàn thành xử lý công việc';
+      await ticketService.updateStatus(ticketId, { status: 'RESOLVED', resolutionNote: note });
+      toast.success('Đã hoàn thành xử lý ticket thành công!');
 
-    setTickets((prev) =>
-      prev.map((ticket) => {
-        if (ticket.id === ticketId) {
-          return {
-            ...ticket,
-            status: 'done' as TicketStatus,
-            completedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return ticket;
-      })
-    );
+      setTickets((prev) =>
+        prev.map((ticket) => {
+          if (ticket.id === ticketId) {
+            const updated = {
+              ...ticket,
+              status: 'done' as TicketStatus,
+              resolutionNote: note,
+              completedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            setSelectedTicket((curr) => (curr && curr.id === ticketId ? { ...curr, ...updated } : curr));
+            return updated;
+          }
+          return ticket;
+        })
+      );
+    } catch (e: any) {
+      console.error('Failed to complete ticket:', e);
+      toast.error(e?.response?.data?.message || 'Hoàn thành ticket thất bại!');
+    }
   };
 
-  // Handle reject ticket
   const handleReject = async (ticketId: string, reason: string) => {
     try {
       await ticketService.updateStatus(ticketId, { status: 'CLOSED', resolutionNote: reason }).catch(() => {});
@@ -309,48 +435,50 @@ export default function TicketsPage() {
     setTickets((prev) =>
       prev.map((ticket) => {
         if (ticket.id === ticketId) {
-          return {
+          const updated = {
             ...ticket,
             status: 'rejected' as TicketStatus,
             rejectedReason: reason,
+            resolutionNote: reason,
             updatedAt: new Date().toISOString(),
           };
+          setSelectedTicket((curr) => curr && curr.id === ticketId ? { ...curr, ...updated } : curr);
+          return updated;
         }
         return ticket;
       })
     );
   };
 
-  // Handle add comment
   const handleAddComment = async (ticketId: string, comment: string) => {
     try {
-      await ticketService.addAdminComment(ticketId, { content: comment }).catch(() => {});
+      const response = await ticketService.addAdminComment(ticketId, { content: comment });
+      const newCommentObj = {
+        id: response?.id || `comment-${Date.now()}`,
+        authorId: response?.userId || currentUser.id,
+        authorName: response?.fullName || currentUser.name,
+        authorRole: (response?.role?.toLowerCase() as any) || (currentUser.role as any),
+        content: comment,
+        createdAt: response?.createdAt || new Date().toISOString(),
+      };
+
+      setTickets((prev) =>
+        prev.map((ticket) => {
+          if (ticket.id === ticketId) {
+            const updated = {
+              ...ticket,
+              comments: [...ticket.comments, newCommentObj],
+              updatedAt: new Date().toISOString(),
+            };
+            setSelectedTicket((curr) => curr && curr.id === ticketId ? { ...curr, ...updated } : curr);
+            return updated;
+          }
+          return ticket;
+        })
+      );
     } catch (e) {
       console.warn(e);
     }
-
-    setTickets((prev) =>
-      prev.map((ticket) => {
-        if (ticket.id === ticketId) {
-          return {
-            ...ticket,
-            comments: [
-              ...ticket.comments,
-              {
-                id: `comment-${Date.now()}`,
-                authorId: currentUser.id,
-                authorName: currentUser.name,
-                authorRole: currentUser.role as any,
-                content: comment,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return ticket;
-      })
-    );
   };
 
   return (
@@ -361,14 +489,12 @@ export default function TicketsPage() {
         transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
         className="relative min-h-[calc(100dvh-8rem)] overflow-hidden rounded-[2rem] border border-white/55 bg-[#ebe4d8] text-[#26231f] shadow-[0_30px_80px_-55px_rgba(38,35,31,0.72)]"
       >
-        {/* Background gradients */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,255,255,0.9),transparent_28%),radial-gradient(circle_at_58%_42%,rgba(194,160,107,0.3),transparent_24%),radial-gradient(circle_at_88%_18%,rgba(87,75,59,0.2),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.54),rgba(150,137,116,0.24))]" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-[linear-gradient(to_top,rgba(67,59,49,0.24),rgba(232,224,211,0.04),transparent)]" />
         <div className="pointer-events-none absolute -left-20 top-24 h-72 w-72 rounded-full bg-white/25 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 right-10 h-96 w-96 rounded-full bg-[#9b7a4a]/16 blur-3xl" />
 
         <div className="relative p-4 sm:p-6 2xl:p-7">
-          {/* Header */}
           <div className="mb-6">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/34 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.22em] text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-xl">
               <AlertCircle className="h-3.5 w-3.5" />
@@ -382,14 +508,12 @@ export default function TicketsPage() {
             </p>
           </div>
 
-          {/* Status Cards */}
           <StatusCards
             tickets={tickets}
             selectedStatus={statusFilter}
             onStatusClick={handleStatusCardClick}
           />
 
-          {/* Filter Bar */}
           <div className="mt-5">
             <FilterBar
               filters={filters}
@@ -399,7 +523,6 @@ export default function TicketsPage() {
             />
           </div>
 
-          {/* Active Filters Bar */}
           {hasActiveFilters && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-xs text-stone-500">Active filters:</span>
@@ -428,10 +551,8 @@ export default function TicketsPage() {
             </div>
           )}
 
-          {/* Tickets List View */}
           <div className="mt-4 rounded-xl border border-white/40 bg-white/20 backdrop-blur-sm overflow-hidden">
             <div className="p-4">
-              {/* Results summary */}
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-stone-600">
@@ -457,14 +578,13 @@ export default function TicketsPage() {
 
               <TicketsListView
                 tickets={filteredTickets}
-                onTicketClick={setSelectedTicket}
+                onTicketClick={handleTicketClick}
               />
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Ticket Detail Modal */}
       <TicketDetailModal
         isOpen={!!selectedTicket}
         ticket={selectedTicket}
@@ -475,6 +595,7 @@ export default function TicketsPage() {
         onAddComment={handleAddComment}
         onUpdateTicket={handleUpdateTicket}
         currentUser={currentUser}
+        assignableUsers={usersList}
       />
     </>
   );

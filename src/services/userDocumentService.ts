@@ -29,6 +29,16 @@ export const userDocumentService = {
   },
 
   /**
+   * Get documents for a specific user ID (Admin)
+   */
+  async getDocumentsByUserId(userId: string): Promise<UserDocumentResponseDto[]> {
+    const { data } = await api.get<ApiResponse<UserDocumentResponseDto[]>>(
+      `/api/users/me/documents/user/${userId}`
+    );
+    return data.result || [];
+  },
+
+  /**
    * Upload or replace a document (Multipart)
    */
   async upsertDocument(

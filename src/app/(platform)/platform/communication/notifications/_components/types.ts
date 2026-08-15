@@ -5,7 +5,7 @@ export type NotificationDelivery = 'inapp' | 'email' | 'both';
 export type NotificationStatus = 'sent' | 'scheduled' | 'draft';
 
 export interface AudienceFilter {
-  type: 'all' | 'block' | 'floor' | 'room';
+  type: 'all' | 'block' | 'floor' | 'room' | 'user';
   value?: string;
 }
 

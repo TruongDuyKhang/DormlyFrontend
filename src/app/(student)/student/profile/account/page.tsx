@@ -1,112 +1,125 @@
 // app/(student)/profile/account/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { ProfileTabs } from '../_components/profile-tabs';
 import { ProfileHeader } from '../_components/profile-header';
 import { PersonalInfo } from '../_components/personal-info';
 import { AcademicInfo } from '../_components/academic-info';
 import { EmergencyContact } from '../_components/emergency-contact';
+import { SecuritySettings } from '../_components/security-settings';
 import { useStudentProfile } from '@/hooks/useStudentProfile';
-import { tokenService, decodeJWT } from '@/services/tokenService';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { roomAssignmentService } from '@/services/roomAssignmentService';
 import { buildingService } from '@/services/buildingService';
 import type { Student, EmergencyContact as EmergencyContactType } from '../_components/types';
 import { Loader2, Home, CheckCircle2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AccountPage() {
-  const { profile, isLoading: profileLoading, updateProfile, refetch } = useStudentProfile();
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { profile, isLoading: profileLoading, refetch: refetchProfile } = useStudentProfile();
+  const { user, isLoading: userLoading, updateUser, refetch: refetchUser } = useCurrentUser();
   const [currentRoomInfo, setCurrentRoomInfo] = useState<{ roomNumber: string; blockName: string; floorLevel: number } | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(false);
 
-  const loadUserInfo = useCallback(async () => {
-    if (typeof window !== 'undefined') {
-      try {
-        const token = tokenService.getAccessToken();
-        const decoded = token ? decodeJWT(token) : null;
-        const stored = localStorage.getItem('session.user') || localStorage.getItem('user');
-        const sessionObj = stored ? JSON.parse(stored) : null;
-
-        setCurrentUser({
-          ...sessionObj,
-          email: decoded?.email || sessionObj?.email || 'user1@gmail.com',
-          fullName: sessionObj?.fullName || decoded?.fullname || 'Phạm Văn Một',
-          id: decoded?.id || sessionObj?.id || '',
-        });
-
-        // Fetch current room assignment
-        setLoadingRoom(true);
-        try {
-          const roomAssignment = await roomAssignmentService.getCurrentRoom().catch(() => null);
-          if (roomAssignment && roomAssignment.roomNodeId) {
-            const allNodes = await buildingService.listNodes().catch(() => []);
-            const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
-            const rNode = nodeMap.get(roomAssignment.roomNodeId);
-            if (rNode) {
-              const fNode = rNode.parentId ? nodeMap.get(rNode.parentId) : undefined;
-              const bNode = fNode?.parentId ? nodeMap.get(fNode.parentId) : undefined;
-              setCurrentRoomInfo({
-                roomNumber: rNode.name,
-                blockName: bNode?.name || 'Tòa A',
-                floorLevel: fNode ? parseInt(fNode.name.replace(/\D/g, '')) || 1 : 1,
-              });
-            }
-          }
-        } catch (e) {
-          console.warn('Could not fetch current room:', e);
-        } finally {
-          setLoadingRoom(false);
+  const loadRoomInfo = useCallback(async () => {
+    setLoadingRoom(true);
+    try {
+      const roomAssignment = await roomAssignmentService.getCurrentRoom().catch(() => null);
+      if (roomAssignment && roomAssignment.roomNodeId) {
+        const allNodes = await buildingService.listNodes().catch(() => []);
+        const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
+        const rNode = nodeMap.get(roomAssignment.roomNodeId);
+        if (rNode) {
+          const fNode = rNode.parentId ? nodeMap.get(rNode.parentId) : undefined;
+          const bNode = fNode?.parentId ? nodeMap.get(fNode.parentId) : undefined;
+          setCurrentRoomInfo({
+            roomNumber: rNode.name,
+            blockName: bNode?.name || 'Toa A',
+            floorLevel: fNode ? parseInt(fNode.name.replace(/\D/g, '')) || 1 : 1,
+          });
         }
-      } catch (e) {
-        console.warn('Could not read user info:', e);
       }
+    } catch (e) {
+      console.warn('Could not fetch current room:', e);
+    } finally {
+      setLoadingRoom(false);
     }
   }, []);
 
   useEffect(() => {
-    loadUserInfo();
-  }, [loadUserInfo]);
+    loadRoomInfo();
+  }, [loadRoomInfo]);
+
+  // Normalize gender from backend (MALE/FEMALE/OTHER) to component format (male/female/other)
+  const normalizeGender = (g?: string): 'male' | 'female' | 'other' => {
+    const lower = g?.toLowerCase();
+    if (lower === 'male') return 'male';
+    if (lower === 'female') return 'female';
+    return 'other';
+  };
+
+  // Normalize dateOfBirth — backend returns LocalDateTime string, keep only YYYY-MM-DD
+  const normalizeDob = (dob?: string): string => {
+    if (!dob) return '';
+    return dob.split('T')[0];
+  };
 
   const student: Student = {
-    id: profile?.id || currentUser?.id || '1',
-    fullName: currentUser?.fullName || profile?.friendName || 'Phạm Văn Một',
-    studentId: profile?.studentCode || 'SV2021001',
-    universityEmail: currentUser?.email || 'user1@gmail.com',
-    phoneNumber: currentUser?.phoneNumber || '0934567890',
-    gender: (currentUser?.gender?.toLowerCase() as any) || 'male',
-    dateOfBirth: currentUser?.dateOfBirth || '2003-02-14',
-    faculty: 'Khoa Công nghệ Thông tin',
-    major: profile?.major || 'Công nghệ Thông tin',
-    academicYear: profile?.startYear ? `${new Date().getFullYear() - profile.startYear + 1}` : '4',
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.fullName || 'Pham Van Mot')}&background=9d7443&color=fff&size=80`,
+    id: user?.id || profile?.id || '',
+    fullName: user?.fullName || '',
+    studentId: profile?.studentCode || '',
+    universityEmail: user?.email || '',
+    phoneNumber: user?.phoneNumber || '',
+    gender: normalizeGender(user?.gender),
+    dateOfBirth: normalizeDob(user?.dateOfBirth),
+    faculty: 'Khoa Cong nghe Thong tin',
+    major: profile?.major || '',
+    academicYear: profile?.startYear
+      ? `${new Date().getFullYear() - profile.startYear + 1}`
+      : '',
+    avatar:
+      user?.avatar ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || 'User')}&background=9d7443&color=fff&size=80`,
   };
 
   const emergencyContact: EmergencyContactType = {
-    name: 'Phụ huynh sinh viên',
-    phoneNumber: '0987654321',
-    relationship: 'Bố / Mẹ',
+    name: 'Phu huynh sinh vien',
+    phoneNumber: '—',
+    relationship: 'Bo / Me',
   };
 
   const handleUpdatePersonalInfo = async (updatedData: Partial<Student>) => {
     try {
-      if (profile) {
-        await updateProfile({
-          studentCode: student.studentId,
-          major: student.major,
-          identityNumber: profile.identityNumber || '079300012345',
-          startYear: profile.startYear || 2021,
-          endYear: profile.endYear || 2025,
-          sleepTime: profile.sleepTime || '23:00',
-          wakeUpTime: profile.wakeUpTime || '06:30',
-        });
-      }
-    } catch (err) {
-      console.error('Failed to update student profile:', err);
+      const formattedGender = updatedData.gender ? updatedData.gender.toUpperCase() : user?.gender;
+      const formattedDob = updatedData.dateOfBirth
+        ? updatedData.dateOfBirth.includes('T')
+          ? updatedData.dateOfBirth
+          : `${updatedData.dateOfBirth}T00:00:00`
+        : user?.dateOfBirth;
+
+      await updateUser({
+        fullName: updatedData.fullName ?? user?.fullName ?? '',
+        phoneNumber: updatedData.phoneNumber ?? user?.phoneNumber ?? '',
+        gender: formattedGender as any,
+        dateOfBirth: formattedDob as any,
+        email: user?.email ?? '',
+      });
+      toast.success('Cập nhật thông tin cá nhân thành công!');
+      await refetchUser();
+    } catch (err: any) {
+      console.error('Failed to update personal info:', err);
+      toast.error('Cập nhật thông tin cá nhân thất bại!');
     }
   };
 
-  const isLoading = profileLoading || loadingRoom;
+  const isLoading = profileLoading || userLoading || loadingRoom;
+
+  const handleRefresh = () => {
+    refetchProfile();
+    refetchUser();
+    loadRoomInfo();
+  };
 
   return (
     <div className="space-y-6 pb-24 lg:pb-4">
@@ -128,10 +141,7 @@ export default function AccountPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              refetch();
-              loadUserInfo();
-            }}
+            onClick={handleRefresh}
             className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white/70 px-3.5 py-2 text-xs font-medium text-stone-700 hover:bg-white transition shadow-sm"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -152,14 +162,15 @@ export default function AccountPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                    Phòng Đang Cư Trú
+                    Phong Dang Cu Tru
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-200/80 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                    <CheckCircle2 className="h-3 w-3" /> Đã Ký Hợp Đồng
+                    <CheckCircle2 className="h-3 w-3" /> Da Ky Hop Dong
                   </span>
                 </div>
                 <h3 className="text-xl font-bold text-stone-800 mt-0.5">
-                  Phòng {currentRoomInfo.roomNumber} • {currentRoomInfo.blockName} (Tầng {currentRoomInfo.floorLevel})
+                  Phong {currentRoomInfo.roomNumber} &bull; {currentRoomInfo.blockName} (Tang{' '}
+                  {currentRoomInfo.floorLevel})
                 </h3>
               </div>
             </div>
@@ -173,6 +184,7 @@ export default function AccountPage() {
         <PersonalInfo student={student} onUpdate={handleUpdatePersonalInfo} />
         <AcademicInfo student={student} />
         <EmergencyContact contact={emergencyContact} />
+        <SecuritySettings user={user} />
       </div>
     </div>
   );

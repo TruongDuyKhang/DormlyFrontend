@@ -90,10 +90,10 @@ export function PerformanceTab() {
   }
 
   // Created vs Resolved trend for Resolution Performance
-  const resolutionPerformanceData = data.monthlyCompletionTrends.map((item, idx) => ({
+  const resolutionPerformanceData = data.monthlyCompletionTrends.map((item) => ({
     month: item.month,
-    created: Math.round(item.count * 0.9 + (idx % 5)),
-    resolved: item.count,
+    created: (item as any).created || 0,
+    resolved: (item as any).resolved || 0,
   }));
 
   return (

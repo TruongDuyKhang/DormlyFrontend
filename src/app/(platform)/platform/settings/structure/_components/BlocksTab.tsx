@@ -273,7 +273,14 @@ export function BlocksTab() {
           </div>
           <div className="rounded-2xl border border-white/60 bg-white/35 backdrop-blur-sm p-4">
             <p className="text-xs uppercase tracking-wider text-stone-500">Overall Occupancy</p>
-            <p className="text-2xl font-semibold text-[#c3a26c] mt-1">{totalOccupancy}%</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <p className="text-2xl font-semibold text-[#c3a26c]">
+                {totalOccupancyCount > 0 && totalOccupancy === 0 ? '< 1' : totalOccupancy}%
+              </p>
+              <span className="text-xs font-semibold text-stone-500">
+                ({totalOccupancyCount} / {totalCapacity})
+              </span>
+            </div>
           </div>
         </div>
 

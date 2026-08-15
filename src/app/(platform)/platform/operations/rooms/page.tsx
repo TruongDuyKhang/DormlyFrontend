@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/_components/ui/input";
+import { toast } from "sonner";
 
 import { Block, Floor, Room, Student } from "./_components/types";
 import { BlocksView } from "./_components/BlocksView";
@@ -112,8 +113,7 @@ export default function RoomsPage() {
               const roomAssignments = assignments.filter(
                 (a) =>
                   a.roomNodeId === rNode.id &&
-                  a.status !== 'CANCELLED' &&
-                  a.status !== 'TERMINATED'
+                  (!a.endDate || new Date(a.endDate).getTime() > Date.now())
               );
 
               const students: Student[] = roomAssignments.map((a, sIdx) => {
@@ -577,50 +577,41 @@ export default function RoomsPage() {
     setShowAssignModal(false);
   };
 
-  const handleTransfer = (targetRoomId: string) => {
+  const handleTransfer = async (targetRoomId: string) => {
     if (!selectedStudentForTransfer || !currentRoom) return;
 
-    // Remove from current room
-    const updatedCurrentRoom: Room = {
-      ...currentRoom,
-      students: currentRoom.students.filter(
-        (s: Student) => s.id !== selectedStudentForTransfer.id,
-      ),
-    };
-    handleEditRoom(updatedCurrentRoom);
-
-    // Add to target room
-    setRoomsData((prev: Block[]) => {
-      const newData = [...prev];
-      for (const block of newData) {
-        for (const floor of block.floors) {
-          const targetRoom = floor.rooms.find(
-            (r: Room) => r.id === targetRoomId,
-          );
-          if (targetRoom) {
-            targetRoom.students.push(selectedStudentForTransfer);
-            break;
-          }
-        }
-      }
-      return newData;
-    });
-
-    setSelectedStudentForTransfer(null);
-    setShowTransferModal(false);
+    try {
+      await roomAssignmentService.assignManual({
+        userId: selectedStudentForTransfer.id,
+        roomNodeId: targetRoomId,
+        startDate: new Date().toISOString(),
+        notes: `Transfer student from room ${currentRoom.number}`,
+      });
+      toast.success(`Chuyển sinh viên ${selectedStudentForTransfer.name} sang phòng mới thành công!`);
+      await loadTree();
+    } catch (e: any) {
+      console.error('Failed to transfer student:', e);
+      toast.error('Chuyển sinh viên sang phòng mới thất bại');
+    } finally {
+      setSelectedStudentForTransfer(null);
+      setShowTransferModal(false);
+    }
   };
 
-  const handleMoveOut = () => {
+  const handleMoveOut = async () => {
     if (!selectedStudentForMoveOut || !currentRoom) return;
-    const updatedRoom: Room = {
-      ...currentRoom,
-      students: currentRoom.students.filter(
-        (s: Student) => s.id !== selectedStudentForMoveOut.id,
-      ),
-    };
-    handleEditRoom(updatedRoom);
-    setSelectedStudentForMoveOut(null);
-    setShowMoveOutModal(false);
+
+    try {
+      await roomAssignmentService.moveOut(selectedStudentForMoveOut.id);
+      toast.success(`Đã thực hiện Move Out cho sinh viên ${selectedStudentForMoveOut.name} thành công!`);
+      await loadTree();
+    } catch (e: any) {
+      console.error('Failed to move out student:', e);
+      toast.error('Thực hiện Move Out cho sinh viên thất bại');
+    } finally {
+      setSelectedStudentForMoveOut(null);
+      setShowMoveOutModal(false);
+    }
   };
 
   const handleAddRoom = (newRoomData: {
@@ -911,7 +902,7 @@ export default function RoomsPage() {
                     floor={currentFloor}
                     onBack={handleBack}
                     onEdit={() => setShowEditModal(true)}
-                    onArchive={handleArchiveRoom}
+                    onArchive={() => setShowArchiveModal(true)}
                     onAssign={() => setShowAssignModal(true)}
                     onTransfer={(student: Student) => {
                       setSelectedStudentForTransfer(student);
@@ -938,7 +929,7 @@ export default function RoomsPage() {
             floor={currentFloor}
             onClose={() => setShowRoomDetailModal(false)}
             onEdit={() => setShowEditModal(true)}
-            onArchive={handleArchiveRoom}
+            onArchive={() => setShowArchiveModal(true)}
             onAssign={() => setShowAssignModal(true)}
             onTransfer={(student: Student) => {
               setSelectedStudentForTransfer(student);
@@ -964,7 +955,11 @@ export default function RoomsPage() {
           <ArchiveConfirmModal
             isOpen={showArchiveModal}
             room={currentRoom || null}
-            onConfirm={handleArchiveRoom}
+            onConfirm={() => {
+              handleArchiveRoom();
+              setShowArchiveModal(false);
+              toast.success("Cập nhật trạng thái lưu trữ thành công!");
+            }}
             onClose={() => setShowArchiveModal(false)}
           />
         )}

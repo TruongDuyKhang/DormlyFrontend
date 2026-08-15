@@ -12,8 +12,10 @@ import {
   Upload,
   XCircle,
   Loader2,
+  ArrowRightLeft,
 } from "lucide-react";
 import type { CreateTicketPayload, TicketCategory } from "../types/ticket";
+import { transferRequestService } from "@/services/transferRequestService";
 
 interface CreateRequestModalProps {
   isOpen: boolean;
@@ -44,6 +46,12 @@ const categoryOptions: {
     label: "Roommate",
     icon: Users,
     description: "Conflict, noise, cleanliness with roommate...",
+  },
+  {
+    id: "TRANSFER",
+    label: "Room Transfer",
+    icon: ArrowRightLeft,
+    description: "Request to move to a different room or floor...",
   },
   {
     id: "SECURITY",
@@ -154,13 +162,18 @@ export function CreateRequestModal({
     if (!category || !title.trim() || !description.trim()) return;
     setIsSubmitting(true);
     try {
+      if (category === "TRANSFER") {
+        await transferRequestService.submitRequest({
+          reason: `${title.trim()}: ${description.trim()}`,
+        });
+      }
       await onCreate(
         { category, title: title.trim(), description: description.trim() },
         attachments,
       );
       handleClose();
-    } catch {
-
+    } catch (e) {
+      console.error("Failed to submit request:", e);
     } finally {
       setIsSubmitting(false);
     }

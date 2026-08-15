@@ -77,7 +77,6 @@ const menuItems: MenuItem[] = [
       { label: "Service Tickets", href: "/platform/operations/tickets" },
       { label: "Room Transfers", href: "/platform/operations/transfers" },
       { label: "Invoices & Billing", href: "/platform/operations/invoices" },
-      { label: "Complaints", href: "/platform/operations/complaints" },
     ]
   },
   { 
@@ -92,7 +91,6 @@ const menuItems: MenuItem[] = [
     label: "Analytics", 
     submenu: [
       { label: "Insights", href: "/platform/analytics/insights" },
-      { label: "Reports", href: "/platform/analytics/reports" },
     ]
   },
   { 

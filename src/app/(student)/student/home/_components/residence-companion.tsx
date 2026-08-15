@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { Cloud, CloudRain, Sun, Moon, Droplets, Wind, CloudRain as RainIcon } from "lucide-react";
 import type { WeatherData } from "./types";
+import { useAuth } from "@/app/(auth)/context/auth-context";
 
 interface ResidenceCompanionProps {
   weather: WeatherData | null;
@@ -19,9 +20,12 @@ const getWeatherIcon = (condition: string, isDay: boolean) => {
 };
 
 export function ResidenceCompanion({ weather }: ResidenceCompanionProps) {
+  const { user } = useAuth();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
-  const userName = "Khang";
+  
+  // Lấy tên gọi (tên cuối cùng trong họ tên)
+  const userName = user?.fullname ? user.fullname.trim().split(' ').pop() || user.fullname : "Resident";
   const isDay = hour >= 6 && hour < 18;
 
   return (

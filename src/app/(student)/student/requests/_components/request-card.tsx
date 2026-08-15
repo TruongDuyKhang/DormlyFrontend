@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Wrench, Building2, Users, ShieldAlert, Receipt, HelpCircle, Flag } from "lucide-react";
+import { Calendar, Wrench, Building2, Users, ShieldAlert, Receipt, HelpCircle, Flag, ArrowRightLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import type { TicketSummary } from "../types/ticket";
 
@@ -28,6 +28,7 @@ const categoryConfig: Record<TicketSummary["category"], { label: string; icon: a
   MAINTENANCE: { label: "Maintenance", icon: Wrench, color: "bg-sky-600 text-white" },
   FACILITY: { label: "Facility", icon: Building2, color: "bg-teal-600 text-white" },
   ROOMMATE: { label: "Roommate", icon: Users, color: "bg-amber-600 text-white" },
+  TRANSFER: { label: "Room Transfer", icon: ArrowRightLeft, color: "bg-indigo-600 text-white" },
   SECURITY: { label: "Security", icon: ShieldAlert, color: "bg-red-600 text-white" },
   BILLING: { label: "Billing", icon: Receipt, color: "bg-violet-600 text-white" },
   OTHER: { label: "Other", icon: HelpCircle, color: "bg-stone-500 text-white" },

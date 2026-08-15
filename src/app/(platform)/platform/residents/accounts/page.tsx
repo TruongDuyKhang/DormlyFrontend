@@ -23,6 +23,7 @@ import { userService } from '@/services/userService';
 import { userDocumentService } from '@/services/userDocumentService';
 import { studentProfileService } from '@/services/studentProfileService';
 import type { UserResponseDto, UserDocumentResponseDto } from '@/types/models';
+import { toast } from 'sonner';
 
 interface StudentApplication {
   id: string;
@@ -34,6 +35,8 @@ interface StudentApplication {
   documents: { id?: string; name: string; status: 'verified' | 'pending' | 'rejected'; url?: string }[];
   status: 'pending' | 'approved' | 'rejected';
   rejectReason?: string;
+  isActive?: boolean;
+  roles?: string[];
 }
 
 type TabType = 'pending' | 'approved' | 'rejected';
@@ -112,6 +115,8 @@ export default function AccountsPage() {
             documents: docs,
             status: appStatus,
             rejectReason: hasRejected ? 'Document needs re-verification' : undefined,
+            isActive: u.isActive ?? false,
+            roles: u.roles || [],
           };
         });
       }
@@ -176,9 +181,11 @@ export default function AccountsPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      await userService.toggleStatus(id).catch(() => {});
-    } catch (e) {
+      await userService.toggleStatus(id);
+      toast.success('Đã duyệt tài khoản và kích hoạt truy cập!');
+    } catch (e: any) {
       console.warn(e);
+      toast.error('Duyệt tài khoản thất bại!');
     }
     setApplications((prev) =>
       prev.map((app) =>
@@ -186,6 +193,7 @@ export default function AccountsPage() {
           ? {
               ...app,
               status: 'approved' as const,
+              isActive: true,
               documents: app.documents.map((d) => ({ ...d, status: 'verified' as const })),
             }
           : app
@@ -193,7 +201,21 @@ export default function AccountsPage() {
     );
   };
 
+  const handleToggleAccountStatus = async (id: string, currentActive: boolean) => {
+    try {
+      const updated = await userService.toggleStatus(id);
+      toast.success(updated.isActive ? 'Đã kích hoạt tài khoản!' : 'Đã khóa tài khoản!');
+      setApplications((prev) =>
+        prev.map((app) => (app.id === id ? { ...app, isActive: updated.isActive } : app))
+      );
+    } catch (e: any) {
+      console.error('Failed to toggle status:', e);
+      toast.error('Cập nhật trạng thái thất bại!');
+    }
+  };
+
   const handleReject = async (id: string, reason?: string) => {
+    toast.info('Đã từ chối đơn đăng ký tài khoản');
     setApplications((prev) =>
       prev.map((app) =>
         app.id === id
@@ -380,6 +402,30 @@ export default function AccountsPage() {
                         Rejected
                       </span>
                     )}
+
+                    {/* Admin Active/Inactive Status Toggle Control */}
+                    <button
+                      onClick={() => handleToggleAccountStatus(app.id, app.isActive ?? false)}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition border',
+                        app.isActive
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                      )}
+                      title="Bấm để bật/tắt kích hoạt tài khoản"
+                    >
+                      {app.isActive ? (
+                        <>
+                          <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserX className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Inactive</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 

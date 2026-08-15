@@ -66,7 +66,12 @@ export default function StudentsPage() {
       const studentsList: StudentWithLocation[] = [];
       const assignedUserIds = new Set<string>();
 
-      assignments.forEach((asg, idx) => {
+      // Filter for active assignments only (matching Rooms & Beds page)
+      const activeAssignments = assignments.filter(
+        (asg) => !asg.endDate || new Date(asg.endDate).getTime() > Date.now()
+      );
+
+      activeAssignments.forEach((asg, idx) => {
         assignedUserIds.add(asg.userId);
         const u = userMap.get(asg.userId);
         const prof = profiles.find((p) => p.id === asg.userId || (u && p.studentCode?.includes(u.email.split('@')[0]))) || profiles[idx % (profiles.length || 1)];
@@ -197,7 +202,10 @@ export default function StudentsPage() {
             (acc, f) => acc + f.rooms.reduce((rAcc, r) => rAcc + r.students.length, 0),
             0
           );
-          const totalBeds = totalRooms * 4 || 160;
+          const totalBeds = floors.reduce(
+            (acc, f) => acc + f.rooms.reduce((rAcc, r) => rAcc + r.capacity, 0),
+            0
+          ) || (totalRooms * 4);
 
           return {
             id: bNode.id,
@@ -289,9 +297,22 @@ export default function StudentsPage() {
   };
 
   const handleViewRoomFromDetail = () => {
-    if (selectedStudent) {
-      setShowStudentDetail(false);
+    if (selectedStudent && selectedStudent.roomNumber && selectedStudent.roomNumber !== 'Chưa xếp phòng') {
+      const block = blocksData.find((b) => b.id === selectedStudent.blockId || b.name === selectedStudent.blockName);
+      if (block) {
+        const floor = block.floors.find((f) => f.level === selectedStudent.floorLevel);
+        if (floor) {
+          const room = floor.rooms.find((r) => r.number === selectedStudent.roomNumber);
+          if (room) {
+            setSelectedBlock(block);
+            setSelectedFloor(floor);
+            setSelectedRoom(room);
+            setCurrentView('students');
+          }
+        }
+      }
     }
+    setShowStudentDetail(false);
   };
 
   const handleBlockSelect = (block: Block) => {

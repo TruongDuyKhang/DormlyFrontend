@@ -1,4 +1,4 @@
-// app/(student)/home/page.tsx
+// app/(student)/student/home/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,21 +9,32 @@ import { CommunityHighlights } from "./_components/community-highlights";
 import { RequestUpdates } from "./_components/request-updates";
 import { MyResidence } from "./_components/my-residence";
 import type { WeatherData } from "./_components/types";
-
-// Roommate data
-const roommates = [
-  { name: "Minh", avatar: "https://ui-avatars.com/api/?name=Minh&background=9d7443&color=fff&bold=true&size=40" },
-  { name: "Lan", avatar: "https://ui-avatars.com/api/?name=Lan&background=9d7443&color=fff&bold=true&size=40" },
-  { name: "Tú", avatar: "https://ui-avatars.com/api/?name=Tu&background=9d7443&color=fff&bold=true&size=40" },
-  { name: "An", avatar: "https://ui-avatars.com/api/?name=An&background=9d7443&color=fff&bold=true&size=40" },
-];
+import { roomAssignmentService } from "@/services/roomAssignmentService";
+import { buildingService } from "@/services/buildingService";
+import { userService } from "@/services/userService";
 
 export default function StudentHomePage() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Residence info states
+  const [residenceInfo, setResidenceInfo] = useState<{
+    roomNumber: string;
+    floorLevel: string;
+    blockName: string;
+    roommates: { name: string; avatar: string }[];
+    isAssigned: boolean;
+  }>({
+    roomNumber: "Chưa xếp phòng",
+    floorLevel: "N/A",
+    blockName: "Chưa gán",
+    roommates: [],
+    isAssigned: false,
+  });
+
   useEffect(() => {
-    const fetchWeather = async () => {
+    const fetchWeatherAndResidence = async () => {
+      // 1. Fetch Weather
       try {
         const geoRes = await fetch(
           `https://geocoding-api.open-meteo.com/v1/search?name=Ho%20Chi%20Minh%20City&count=1&language=en&format=json`
@@ -67,12 +78,77 @@ export default function StudentHomePage() {
           city: "Ho Chi Minh City",
           country: "VN",
         });
+      }
+
+      // 2. Fetch Live Residence Info
+      try {
+        const currentAsg = await roomAssignmentService.getCurrentRoom();
+        if (currentAsg && currentAsg.roomNodeId) {
+          const [allNodes, allAssignments, allUsers] = await Promise.all([
+            buildingService.listNodes(),
+            roomAssignmentService.list(),
+            userService.list(),
+          ]);
+
+          const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
+          const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+          // Resolve room hierarchy details
+          const roomNode = nodeMap.get(currentAsg.roomNodeId);
+          const roomNumber = roomNode?.name || "N/A";
+          let floorLevel = "N/A";
+          let blockName = "N/A";
+
+          if (roomNode?.parentId) {
+            const floorNode = nodeMap.get(roomNode.parentId);
+            floorLevel = floorNode?.name?.replace(/\D/g, '') || "1";
+            if (floorNode?.parentId) {
+              const blockNode = nodeMap.get(floorNode.parentId);
+              blockName = blockNode?.name || "Tòa nhà";
+            }
+          }
+
+          // Resolve roommates
+          const roomOccupants = allAssignments.filter(
+            (asg) => asg.roomNodeId === currentAsg.roomNodeId
+          );
+
+          const mates = roomOccupants
+            .map((asg) => {
+              const u = userMap.get(asg.userId);
+              if (!u) return null;
+              return {
+                name: u.fullName || "Bạn cùng phòng",
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  u.fullName || "RM"
+                )}&background=9d7443&color=fff&bold=true&size=40`,
+              };
+            })
+            .filter(Boolean) as { name: string; avatar: string }[];
+
+          setResidenceInfo({
+            roomNumber,
+            floorLevel,
+            blockName,
+            roommates: mates,
+            isAssigned: true,
+          });
+        }
+      } catch (err) {
+        console.warn("Student room assignment is empty or failed to load:", err);
+        setResidenceInfo({
+          roomNumber: "Chưa xếp phòng",
+          floorLevel: "N/A",
+          blockName: "Chưa gán",
+          roommates: [],
+          isAssigned: false,
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchWeather();
+    fetchWeatherAndResidence();
   }, []);
 
   if (loading) {
@@ -100,15 +176,19 @@ export default function StudentHomePage() {
             </div>
 
             {/* My Residence Component */}
-            <MyResidence roommates={roommates} />
+            <MyResidence 
+              roomNumber={residenceInfo.roomNumber}
+              floorLevel={residenceInfo.floorLevel}
+              blockName={residenceInfo.blockName}
+              roommates={residenceInfo.roommates}
+              isAssigned={residenceInfo.isAssigned}
+            />
           </div>
         </section>
 
-        {/* Grid 2 cột - Tỉ lệ 6:4 */}
+        {/* Grid 2 columns */}
         <section className="mt-6">
-      
-            <RequestUpdates />
-
+          <RequestUpdates />
         </section>
       </div>
     </>

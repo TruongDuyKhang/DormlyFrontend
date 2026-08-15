@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef } from "react";
 import {
   Download,
   Eye,
@@ -13,6 +14,7 @@ import { ResidenceTabs } from "../_components/residence-tabs";
 import { StatusBadge } from "../_components/status-badge";
 import { useDocuments } from "./hooks/useDocuments";
 import { useDocumentFile } from "./hooks/useDocumentFile";
+import { uploadDocument } from "./services/documentService";
 
 function formatDate(iso?: string) {
   if (!iso) return "";
@@ -29,8 +31,45 @@ export default function StudentDocumentsPage() {
   const isLoading = status === "idle" || status === "loading";
   const isFileLoading = fileStatus === "loading";
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeUploadType, setActiveUploadType] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleTriggerUpload = (docType: string) => {
+    setActiveUploadType(docType);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeUploadType) return;
+
+    setIsUploading(true);
+    try {
+      await uploadDocument(activeUploadType, file);
+      await refetch();
+    } catch (err: any) {
+      console.error("Failed to upload document:", err);
+      alert(err?.response?.data?.message || err?.message || "Lỗi khi tải lên tài liệu");
+    } finally {
+      setIsUploading(false);
+      setActiveUploadType(null);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-24 lg:pb-4">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*,application/pdf"
+        className="hidden"
+      />
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-stone-500">
@@ -97,8 +136,8 @@ export default function StudentDocumentsPage() {
                             : "Not uploaded yet"}
                         </p>
                         {document.status === "REJECTED" && document.rejectReason && (
-                          <p className="mt-1 text-xs text-rose-600">
-                            Reason: {document.rejectReason}
+                          <p className="mt-1 text-xs text-rose-600 font-medium">
+                            Lý do từ chối: {document.rejectReason}
                           </p>
                         )}
                       </div>
@@ -133,8 +172,16 @@ export default function StudentDocumentsPage() {
                           </button>
                         </>
                       )}
-                      <button className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98]">
-                        <RefreshCw className="h-3.5 w-3.5" />
+                      <button
+                        disabled={isUploading && activeUploadType === document.documentType}
+                        onClick={() => handleTriggerUpload(document.documentType)}
+                        className="inline-flex h-9 items-center gap-2 rounded-full border border-stone-300/70 bg-white/44 px-3 text-xs font-medium text-stone-700 transition hover:bg-white active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {isUploading && activeUploadType === document.documentType ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#9d7443]" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
                         {document.uploaded ? "Replace" : "Upload"}
                       </button>
                     </div>

@@ -6,39 +6,38 @@ import { ProfileTabs } from '../_components/profile-tabs';
 import { SecuritySettings } from '../_components/security-settings';
 import { ContactInfo } from '../_components/contact-info';
 import { useStudentProfile } from '@/hooks/useStudentProfile';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import type { Student } from '../_components/types';
 import { Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { profile, isLoading } = useStudentProfile();
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { profile, isLoading: profileLoading } = useStudentProfile();
+  const { user, isLoading: userLoading } = useCurrentUser();
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const item = localStorage.getItem('session.user') || localStorage.getItem('user');
-        if (item) {
-          setCurrentUser(JSON.parse(item));
-        }
-      } catch (e) {
-        console.warn('Could not read user from storage:', e);
-      }
-    }
-  }, []);
+  const normalizeGender = (g?: string): 'male' | 'female' | 'other' => {
+    const lower = g?.toLowerCase();
+    if (lower === 'male') return 'male';
+    if (lower === 'female') return 'female';
+    return 'other';
+  };
 
   const student: Student = {
-    id: profile?.id || currentUser?.id || '1',
-    fullName: currentUser?.fullName || profile?.friendName || 'Phạm Văn Một',
-    studentId: profile?.studentCode || 'SV2021001',
-    universityEmail: currentUser?.email || 'user1@gmail.com',
-    phoneNumber: currentUser?.phoneNumber || '0934567890',
-    gender: (currentUser?.gender?.toLowerCase() as any) || 'male',
-    dateOfBirth: currentUser?.dateOfBirth || '2003-02-14',
+    id: user?.id || profile?.id || '',
+    fullName: user?.fullName || '',
+    studentId: profile?.studentCode || '',
+    universityEmail: user?.email || '',
+    phoneNumber: user?.phoneNumber || '',
+    gender: normalizeGender(user?.gender),
+    dateOfBirth: user?.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
     faculty: 'Khoa Công nghệ Thông tin',
-    major: profile?.major || 'Công nghệ Thông tin',
-    academicYear: profile?.startYear ? `${new Date().getFullYear() - profile.startYear + 1}` : '3',
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.fullName || 'Pham Van Mot')}&background=9d7443&color=fff&size=80`,
+    major: profile?.major || '',
+    academicYear: profile?.startYear ? `${new Date().getFullYear() - profile.startYear + 1}` : '',
+    avatar:
+      user?.avatar ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || 'User')}&background=9d7443&color=fff&size=80`,
   };
+
+  const isLoading = profileLoading || userLoading;
 
   return (
     <div className="space-y-6 pb-24 lg:pb-4">
@@ -63,7 +62,7 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="space-y-6">
-        <SecuritySettings />
+        <SecuritySettings user={user} />
         <ContactInfo student={student} />
       </div>
     </div>

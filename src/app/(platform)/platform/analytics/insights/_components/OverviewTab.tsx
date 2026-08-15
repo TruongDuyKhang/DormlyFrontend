@@ -125,10 +125,10 @@ export function OverviewTab({ dateRange }: { dateRange?: DateRange }) {
   const occupancyRate = data.occupancyRate;
 
   // Ticket activity with created vs resolved
-  const ticketActivityData = data.ticketVolume.map((item, idx) => ({
+  const ticketActivityData = data.ticketVolume.map((item) => ({
     month: item.month,
-    created: item.count,
-    resolved: Math.round(item.count * 0.85 + (idx % 4)),
+    created: (item as any).created || 0,
+    resolved: (item as any).resolved || 0,
   }));
 
   return (

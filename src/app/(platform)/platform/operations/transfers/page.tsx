@@ -46,65 +46,14 @@ export default function AdminTransfersPage() {
       const loadedUsers = usersRes.status === 'fulfilled' && usersRes.value && Array.isArray(usersRes.value) ? usersRes.value : [];
       const allNodes = nodesRes.status === 'fulfilled' && nodesRes.value && Array.isArray(nodesRes.value) ? nodesRes.value : [];
 
-      if (loadedRequests.length === 0) {
-        loadedRequests = [
-          {
-            id: 'tr-1',
-            userId: 'u-1',
-            fromRoomId: 'rm-a-101',
-            toRoomId: 'rm-a-102',
-            reason: 'Mong muốn chuyển sang phòng yên tĩnh hơn do lịch học và nghiên cứu ca đêm.',
-            status: 'PENDING',
-            createdAt: '2025-08-09T08:30:00.000Z',
-          },
-          {
-            id: 'tr-2',
-            userId: 'u-2',
-            fromRoomId: 'rm-b-101',
-            toRoomId: 'rm-a-201',
-            reason: 'Chuyển về gần nhóm dự án nghiên cứu khoa học tại Tòa A.',
-            status: 'APPROVED',
-            reviewedBy: 'Admin',
-            reviewedAt: '2025-08-08T14:20:00.000Z',
-            reviewNote: 'Đã phân bổ sang phòng A-201',
-            createdAt: '2025-08-07T10:15:00.000Z',
-          },
-          {
-            id: 'tr-3',
-            userId: 'u-3',
-            fromRoomId: 'rm-c-101',
-            toRoomId: 'rm-b-102',
-            reason: 'Yêu cầu chuyển phòng cùng bạn học.',
-            status: 'REJECTED',
-            reviewedBy: 'Admin',
-            reviewedAt: '2025-08-06T09:00:00.000Z',
-            reviewNote: 'Phòng đích hiện tại đã đạt sức chứa tối đa.',
-            createdAt: '2025-08-05T16:45:00.000Z',
-          },
-        ];
-      }
-
       setRequests(loadedRequests);
-      
-      const defaultUsers: UserResponseDto[] = [
-        { id: 'u-1', fullName: 'Nguyễn Văn An', email: 'an.nguyen@dormly.edu.vn', isActive: true, roles: ['ROLE_USER'] },
-        { id: 'u-2', fullName: 'Trần Minh Đức', email: 'duc.tran@dormly.edu.vn', isActive: true, roles: ['ROLE_USER'] },
-        { id: 'u-3', fullName: 'Lê Hoàng Nam', email: 'nam.le@dormly.edu.vn', isActive: true, roles: ['ROLE_USER'] },
-      ];
-      setUsers(loadedUsers.length > 0 ? loadedUsers : defaultUsers);
+      setUsers(loadedUsers);
 
-      // Filter leaf rooms
-      const leafRooms = allNodes.filter((n) => n.parentId && allNodes.some((f) => f.id === n.parentId && f.parentId));
-      const finalRooms = leafRooms.length > 0 ? leafRooms : allNodes.length > 0 ? allNodes : [
-        { id: 'rm-a-101', nodeTypeId: 'room', name: 'A-101 (Tòa A - Tầng 1)', maxCapacity: 4 },
-        { id: 'rm-a-102', nodeTypeId: 'room', name: 'A-102 (Tòa A - Tầng 1)', maxCapacity: 2 },
-        { id: 'rm-a-201', nodeTypeId: 'room', name: 'A-201 (Tòa A - Tầng 2)', maxCapacity: 4 },
-        { id: 'rm-b-101', nodeTypeId: 'room', name: 'B-101 (Tòa B - Tầng 1)', maxCapacity: 4 },
-        { id: 'rm-c-101', nodeTypeId: 'room', name: 'C-101 (Tòa C - Tầng 1)', maxCapacity: 2 },
-      ];
-      setRooms(finalRooms as any);
-      if (finalRooms.length > 0) {
-        setTargetRoomNodeId(finalRooms[0].id);
+      // Filter leaf rooms (rooms with maxCapacity)
+      const leafRooms = allNodes.filter((n) => n.maxCapacity && n.maxCapacity > 0);
+      setRooms(leafRooms);
+      if (leafRooms.length > 0) {
+        setTargetRoomNodeId(leafRooms[0].id);
       }
     } catch (e) {
       console.error('Failed to load transfers:', e);
@@ -121,19 +70,12 @@ export default function AdminTransfersPage() {
     if (!targetRoomNodeId) return;
     setIsProcessing(true);
     try {
-      // 1. Update transfer request status to APPROVED
+      // Update transfer request status to APPROVED (Backend automatically invokes assignManual)
       await transferRequestService.updateStatus(req.id, {
         status: 'APPROVED' as any,
+        toRoomId: targetRoomNodeId,
         adminNotes: `Đã duyệt và xếp phòng mới: ${targetRoomNodeId}`,
-      });
-
-      // 2. Assign to target room
-      await roomAssignmentService.assignManual({
-        userId: (req as any).userId,
-        roomNodeId: targetRoomNodeId,
-        startDate: new Date().toISOString(),
-        notes: `Chuyển phòng theo yêu cầu transfer #${req.id}`,
-      });
+      } as any);
 
       setRequests((prev) =>
         prev.map((r) => (r.id === req.id ? { ...r, status: 'APPROVED' as any } : r))

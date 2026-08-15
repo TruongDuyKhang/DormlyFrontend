@@ -27,7 +27,7 @@ export default function RegisterPage() {
       </div>
 
       <section className="relative z-10 flex min-h-[100dvh] items-center justify-center p-6 lg:ml-auto lg:w-[55%]">
-        <div className="relative w-full max-w-[720px] max-h-[90vh] overflow-y-auto rounded-[32px] bg-white/80 p-8 shadow-2xl backdrop-blur-sm">
+        <div className="relative w-full max-w-[840px] max-h-[90vh] overflow-y-auto rounded-[32px] bg-white/80 p-8 shadow-2xl backdrop-blur-sm">
           <header className="mb-6">
             <div className="mb-4 flex justify-center lg:hidden">
               <Image

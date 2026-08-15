@@ -158,8 +158,8 @@ export function FileUploadField({
                   <FileText className="h-6 w-6 text-stone-500" />
                 </div>
               )}
-              <div>
-                <p className="text-sm font-medium text-stone-900">{file.name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-stone-900 truncate" title={file.name}>{file.name}</p>
                 <p className="text-xs text-stone-500">{file.size}</p>
               </div>
             </div>

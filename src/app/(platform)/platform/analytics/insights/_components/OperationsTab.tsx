@@ -94,11 +94,10 @@ export function OperationsTab() {
 
   const totalTickets = data.statusDistribution.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Created vs Resolved Trend
-  const createdVsResolvedData = data.resolutionTrends.map((item, idx) => ({
+  const createdVsResolvedData = data.resolutionTrends.map((item) => ({
     month: item.month,
-    created: Math.round(28 + (idx * 3) % 20),
-    resolved: Math.round(25 + (idx * 3.2) % 20),
+    created: (item as any).created || 0,
+    resolved: (item as any).resolved || 0,
   }));
 
   return (

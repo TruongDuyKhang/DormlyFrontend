@@ -64,6 +64,7 @@ export interface UserRequest {
 export interface ChangePasswordRequest {
   oldPassword?: string;
   newPassword?: string;
+  confirmPassword?: string;
 }
 
 // ================= STUDENT PROFILE MODELS =================
@@ -410,7 +411,7 @@ export interface InvoiceRequestDto {
   feeCategory: FeeCategory;
   amount: number;
   month: string;
-  dueDate: string;
+  dueDate?: string;
   notes?: string;
 }
 
@@ -431,7 +432,7 @@ export interface AnnouncementRequestDto {
 }
 
 // ================= NOTIFICATION MODELS =================
-export type ChannelType = "EMAIL" | "SMS" | "FCM";
+export type ChannelType = "EMAIL" | "SMS" | "PUSH" | "WEBSOCKET" | "FCM";
 
 export interface NotificationRequest {
   recipient: string;
@@ -447,6 +448,7 @@ export interface NotificationLog {
   recipient: string;
   channel: ChannelType;
   subject: string;
+  message?: string;
   status: "QUEUED" | "SENT" | "FAILED";
   errorMessage?: string;
   createdAt: string;

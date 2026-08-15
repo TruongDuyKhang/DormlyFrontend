@@ -5,8 +5,23 @@ import type {
   UserRequest,
   ChangePasswordRequest,
 } from "@/types/models";
+import { tokenService, decodeJWT } from "./tokenService";
 
 export const userService = {
+  /**
+   * Get current authenticated user's full profile (phone, gender, dateOfBirth, etc.)
+   * Decodes the stored JWT to extract userId, then calls GET /api/users/{id}
+   */
+  async getMe(): Promise<UserResponseDto> {
+    const token = tokenService.getAccessToken();
+    const decoded = token ? decodeJWT(token) : null;
+    if (!decoded?.id) {
+      throw new Error("No authenticated user found");
+    }
+    const { data } = await api.get<ApiResponse<UserResponseDto>>(`/api/users/${decoded.id}`);
+    return data.result;
+  },
+
   /**
    * Get all users (Admin/Staff)
    */

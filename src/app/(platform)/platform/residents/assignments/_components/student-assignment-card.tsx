@@ -16,7 +16,9 @@ import {
   Phone,
   Calendar,
   BookOpen,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  FileCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StudentAssignment } from './types';
@@ -27,7 +29,7 @@ interface StudentAssignmentCardProps {
   onToggle: () => void;
   onAutoAssign: (studentId: string) => void;
   onManualAssign: (student: StudentAssignment) => void;
-  onReject: (studentId: string) => void;
+  onReject: (studentId: string, reason: string) => void;
   isAssigned?: boolean;
   showActions?: boolean;
 }
@@ -48,7 +50,7 @@ export function StudentAssignmentCard({
 
   const handleReject = () => {
     if (showRejectReason && rejectReason.trim()) {
-      onReject(student.id);
+      onReject(student.id, rejectReason);
       setShowRejectReason(false);
       setRejectReason('');
     } else {
@@ -174,18 +176,33 @@ export function StudentAssignmentCard({
                     <p className="mt-1 text-sm font-medium text-stone-900">{student.startYear} - {student.endYear}</p>
                   </div>
                   <div className="rounded-lg bg-white/30 px-3 py-2.5">
-                    <p className="text-xs text-stone-500">Documents</p>
-                    <div className="mt-1 flex gap-3">
-                      <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
-                        <img src="/check-circle.svg" alt="Verified" className="h-4 w-4" />
-                        Citizen ID
+                    <p className="text-xs text-stone-500 font-medium flex items-center gap-1">
+                      <FileCheck className="h-3.5 w-3.5 text-[#c3a26c]" /> Documents
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        Citizen ID: Verified
                       </span>
-                      <span className={cn(
-                        'text-xs font-medium flex items-center gap-1',
-                        student.documents.studentCard ? 'text-emerald-600' : 'text-red-500'
-                      )}>
-                        <img src={student.documents.studentCard ? '/check-circle.svg' : '/x-circle.svg'} alt="Status" className="h-4 w-4" />
-                        Student Card
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                          student.documents?.studentCard
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        )}
+                      >
+                        {student.documents?.studentCard ? (
+                          <>
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                            Student Card: Verified
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="h-3 w-3 text-amber-600" />
+                            Student Card: Pending
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -249,6 +266,18 @@ export function StudentAssignmentCard({
                   </>
                 )}
 
+                {student.status === 'rejected' && (
+                  <div className="flex items-start gap-2 rounded-xl bg-red-50 border border-red-200/60 px-4 py-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-800">Đơn xếp phòng bị từ chối</p>
+                      <p className="text-xs text-red-700 mt-0.5">
+                        <strong>Lý do từ chối:</strong> {student.rejectionReason || 'Chưa cung cấp lý do.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Reject Reason Input */}
                 {showRejectReason && !isAssigned && showActions && (
                   <div className="rounded-xl border border-red-200/60 bg-red-50/40 px-4 py-3">
@@ -264,7 +293,7 @@ export function StudentAssignmentCard({
                       <button
                         onClick={() => {
                           if (rejectReason.trim()) {
-                            onReject(student.id);
+                            onReject(student.id, rejectReason);
                             setShowRejectReason(false);
                             setRejectReason('');
                           }

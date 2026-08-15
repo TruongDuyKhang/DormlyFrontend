@@ -36,6 +36,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/_components/ui/avatar";
 import { Button } from "@/_components/ui/button";
 import { useAuth } from "@/app/(auth)/context/auth-context";
+import { notificationService } from "@/services/notificationService";
+import type { NotificationLog } from "@/types/models";
 
 const items = [
   { label: "Home", href: "/student/home", icon: Home },
@@ -56,6 +58,9 @@ export function StudentShellNav() {
     initials: "ST",
   });
 
+  const [notifications, setNotifications] = useState<NotificationLog[]>([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+
   useEffect(() => {
     if (user) {
       const name = user.fullname || user.email?.split("@")[0] || "Student";
@@ -71,6 +76,17 @@ export function StudentShellNav() {
         email: user.email || "student@dormly.edu",
         initials,
       });
+
+      if (user.email) {
+        setLoadingNotifs(true);
+        notificationService.getLogs({ recipient: user.email })
+          .then((res) => {
+            const list = res?.content || (Array.isArray(res) ? res : []);
+            setNotifications(list);
+          })
+          .catch((e) => console.warn("Could not fetch student notifications:", e))
+          .finally(() => setLoadingNotifs(false));
+      }
     }
   }, [user]);
 
@@ -209,6 +225,58 @@ export function StudentShellNav() {
                     </a>
                   </div>
                 </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Student Notifications Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-10 w-10 rounded-full border border-white/60 bg-white/32 text-stone-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] hover:bg-white/55"
+              >
+                <Bell className="h-4 w-4" />
+                {notifications.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-600 text-[10px] font-bold text-white shadow-sm">
+                    {notifications.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-80 sm:w-96 border-white/60 bg-[#f3eee6]/95 p-4 text-stone-800 shadow-2xl backdrop-blur-xl max-h-96 overflow-y-auto"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-stone-200/80 pb-2">
+                  <div className="flex items-center gap-1.5 font-bold text-sm text-stone-800">
+                    <Bell className="h-4 w-4 text-[#c3a26c]" />
+                    <span>Thông Báo Sinh Viên</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-stone-500 bg-white/60 px-2 py-0.5 rounded-full">
+                    {notifications.length} thông báo
+                  </span>
+                </div>
+
+                {loadingNotifs ? (
+                  <div className="py-6 text-center text-xs text-stone-500">Đang tải thông báo...</div>
+                ) : notifications.length > 0 ? (
+                  <div className="space-y-2">
+                    {notifications.map((n, idx) => (
+                      <div key={n.eventId || idx} className="rounded-xl border border-white/60 bg-white/50 p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-xs text-stone-900">{n.subject || 'Thông báo ký túc xá'}</span>
+                          <span className="text-[10px] text-stone-400">{n.createdAt ? new Date(n.createdAt).toLocaleDateString('vi-VN') : ''}</span>
+                        </div>
+                        <p className="text-xs text-stone-600 leading-snug">{n.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-xs text-stone-500">Chưa có thông báo nào dành cho bạn.</div>
+                )}
               </div>
             </PopoverContent>
           </Popover>

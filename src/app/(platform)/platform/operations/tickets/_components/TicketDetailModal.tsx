@@ -1,17 +1,18 @@
 // app/(platform)/operations/tickets/_components/TicketDetailModal.tsx
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, User, MapPin, Calendar, Clock, AlertCircle, FileText, 
   MessageCircle, Paperclip, Send, UserCheck, Wrench, CheckCircle,
-  XCircle, Download, Home, Layers, Image, Video, File, Eye,
-  ChevronDown, Flag, Save, Play, AlertTriangle
+  XCircle, Download, Home, Layers, Video, File, Eye,
+  ChevronDown, Flag, Save, Play, AlertTriangle, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Ticket, Attachment, TicketPriority } from './types';
 import { StatusBadge } from './StatusBadge';
+import { fileServeService } from '@/services/fileServeService';
 
 interface TicketDetailModalProps {
   isOpen: boolean;
@@ -23,22 +24,78 @@ interface TicketDetailModalProps {
   onAddComment: (ticketId: string, comment: string) => void;
   onUpdateTicket: (ticketId: string, priority: TicketPriority, assignedToId: string, assignedToName: string, deadline: string) => void;
   currentUser: { id: string; name: string; role: string };
+  assignableUsers?: any[];
 }
-
-// Danh sách manager
-const managersList = [
-  { id: 'm1', name: 'Mai Tran', role: 'Senior Manager', avatar: 'MT', department: 'Operations' },
-  { id: 'm2', name: 'Linh Vo', role: 'Facility Manager', avatar: 'LV', department: 'Maintenance' },
-  { id: 'm3', name: 'Khoa Nguyen', role: 'Technical Lead', avatar: 'KN', department: 'Technical' },
-  { id: 'm4', name: 'Thuy Pham', role: 'Residence Manager', avatar: 'TP', department: 'Residence' },
-  { id: 'm5', name: 'Anh Le', role: 'Maintenance Staff', avatar: 'AL', department: 'Maintenance' },
-];
 
 const priorityOptions: { value: TicketPriority; label: string; color: string }[] = [
   { value: 'high', label: 'High', color: 'text-red-700 bg-red-100 border-red-200' },
   { value: 'medium', label: 'Medium', color: 'text-amber-700 bg-amber-100 border-amber-200' },
   { value: 'low', label: 'Low', color: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
 ];
+
+function parseDateSecure(dateString: string | null | undefined) {
+  if (!dateString) return new Date();
+  let formattedStr = dateString;
+  if (!dateString.includes('Z') && !dateString.includes('+')) {
+    formattedStr = dateString + 'Z';
+  }
+  return new Date(formattedStr);
+}
+
+// Secure Authenticated Image Component
+function SecureImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [objectUrl, setObjectUrl] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    if (!src) return;
+
+    fileServeService.fetchSecureBlob(src)
+      .then((url) => {
+        if (active) {
+          setObjectUrl(url);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load secure image:", err);
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [src]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center bg-stone-100/50 w-full h-full min-h-[80px]">
+        <Loader2 className="h-4 w-4 animate-spin text-[#c3a26c]" />
+      </div>
+    );
+  }
+
+  if (!objectUrl) {
+    return (
+      <div className="flex items-center justify-center bg-stone-100/50 w-full h-full min-h-[80px] text-xs text-stone-400">
+        No image
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={objectUrl}
+      alt={alt}
+      className={className}
+    />
+  );
+}
 
 // Attachment Viewer Modal
 function AttachmentViewer({ attachment, onClose }: { attachment: Attachment | null; onClose: () => void }) {
@@ -59,7 +116,7 @@ function AttachmentViewer({ attachment, onClose }: { attachment: Attachment | nu
         initial={{ scale: 0.95 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.95 }}
-        className="relative max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden bg-stone-900"
+        className="relative max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden bg-stone-900 w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -73,7 +130,7 @@ function AttachmentViewer({ attachment, onClose }: { attachment: Attachment | nu
         </div>
         <div className="p-4 flex items-center justify-center bg-stone-900 min-h-[350px]">
           {isImage && (
-            <img
+            <SecureImage
               src={attachment.fileUrl}
               alt={attachment.fileName}
               className="max-w-full max-h-[70vh] object-contain rounded-lg"
@@ -129,7 +186,7 @@ function AttachmentGallery({ attachments, onView }: { attachments: Attachment[];
         >
           {att.fileType === 'image' && (
             <div className="aspect-video bg-stone-100 flex items-center justify-center overflow-hidden">
-              <img
+              <SecureImage
                 src={att.fileUrl}
                 alt={att.fileName}
                 className="w-full h-full object-cover hover:scale-105 transition duration-300"
@@ -169,7 +226,7 @@ function AttachmentGallery({ attachments, onView }: { attachments: Attachment[];
 // Timeline Item
 function TimelineItem({ event, isLast }: { event: any; isLast: boolean }) {
   const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return parseDateSecure(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
   
   const getIcon = (iconName: string) => {
@@ -206,7 +263,7 @@ function TimelineItem({ event, isLast }: { event: any; isLast: boolean }) {
 // Comment Item
 function CommentItem({ comment }: { comment: any }) {
   const formatDateTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString('en-US', {
+    return parseDateSecure(timestamp).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -236,12 +293,14 @@ function AssignManagerDropdown({
   isOpen, 
   onClose, 
   onSelect,
-  selectedId
+  selectedId,
+  managersList
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   onSelect: (id: string, name: string) => void;
   selectedId: string;
+  managersList: { id: string; name: string; role: string; avatar: string; department: string }[];
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -310,7 +369,8 @@ export function TicketDetailModal({
   onStartWork,
   onAddComment,
   onUpdateTicket,
-  currentUser 
+  currentUser,
+  assignableUsers
 }: TicketDetailModalProps) {
   const [newComment, setNewComment] = useState('');
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
@@ -324,7 +384,39 @@ export function TicketDetailModal({
   const [deadline, setDeadline] = useState('');
   
   const assignButtonRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic managers list from users API
+  const managersList = useMemo(() => {
+    if (assignableUsers && assignableUsers.length > 0) {
+      return assignableUsers
+        .filter(u => u.roles && u.roles.some((role: string) => ['ADMIN', 'STAFF', 'MANAGER'].includes(role.toUpperCase())))
+        .map(u => ({
+          id: u.id,
+          name: u.fullName || u.email,
+          role: u.roles.join(', '),
+          avatar: u.fullName ? u.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'ST',
+          department: 'Dormitory'
+        }));
+    }
+    // Fallback static list
+    return [
+      { id: 'm1', name: 'Mai Tran', role: 'Senior Manager', avatar: 'MT', department: 'Operations' },
+      { id: 'm2', name: 'Linh Vo', role: 'Facility Manager', avatar: 'LV', department: 'Maintenance' },
+      { id: 'm3', name: 'Khoa Nguyen', role: 'Technical Lead', avatar: 'KN', department: 'Technical' },
+      { id: 'm4', name: 'Thuy Pham', role: 'Residence Manager', avatar: 'TP', department: 'Residence' },
+      { id: 'm5', name: 'Anh Le', role: 'Maintenance Staff', avatar: 'AL', department: 'Maintenance' },
+    ];
+  }, [assignableUsers]);
   
+  // Set defaults when ticket changes
+  useEffect(() => {
+    if (ticket) {
+      setSelectedPriority(ticket.priority || 'medium');
+      setSelectedManagerId(ticket.assignedTo?.id || '');
+      setDeadline(ticket.deadline ? new Date(ticket.deadline).toISOString().split('T')[0] : '');
+    }
+  }, [ticket]);
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (!isOpen) return;
@@ -345,7 +437,7 @@ export function TicketDetailModal({
   if (!isOpen || !ticket) return null;
   
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
+    return parseDateSecure(dateString).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -354,18 +446,13 @@ export function TicketDetailModal({
     });
   };
   
-  // Check if ticket is overdue - FIXED: changed 'completed' to 'done'
   const isOverdue = ticket.deadline && new Date(ticket.deadline) < new Date() && ticket.status !== 'done';
-  
-  // Determine current status display - FIXED: changed 'completed' to 'done'
   const displayStatus = isOverdue && ticket.status !== 'done' ? 'overdue' : ticket.status;
   
-  // Status mapping for UI
   const isPending = ticket.status === 'pending';
   const isAssigned = ticket.status === 'assigned';
   const isInProgress = ticket.status === 'in_progress';
-  const isAdmin = currentUser.role === 'admin';
-  const canUpdateAssign = isPending && isAdmin;
+  const canUpdateAssign = isPending;
   
   const selectedManager = managersList.find(m => m.id === selectedManagerId);
   
@@ -382,7 +469,7 @@ export function TicketDetailModal({
     }
   };
   
-  const canReject = (isPending || isAssigned) && isAdmin;
+  const canReject = (isPending || isAssigned || isInProgress);
   
   return (
     <>
@@ -429,7 +516,27 @@ export function TicketDetailModal({
                   </div>
                   
                   {/* Action Buttons - Based on Status */}
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {/* Nhận việc (Accept Job) button: show for pending or assigned */}
+                    {(isPending || isAssigned) && (
+                      <button
+                        onClick={() => {
+                          onUpdateTicket(
+                            ticket.id, 
+                            ticket.priority || 'medium', 
+                            currentUser.id, 
+                            currentUser.name, 
+                            ticket.deadline ? new Date(ticket.deadline).toISOString().split('T')[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                          );
+                          onStartWork(ticket.id);
+                        }}
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition flex items-center gap-2 whitespace-nowrap"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        Nhận việc
+                      </button>
+                    )}
+
                     {/* PENDING: Show Update & Assign */}
                     {canUpdateAssign && (
                       <button
@@ -443,7 +550,7 @@ export function TicketDetailModal({
                     )}
                     
                     {/* ASSIGNED: Show Start Work */}
-                    {isAssigned && !isAdmin && (
+                    {isAssigned && (
                       <button
                         onClick={() => onStartWork(ticket.id)}
                         className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 transition flex items-center gap-2 whitespace-nowrap"
@@ -464,7 +571,7 @@ export function TicketDetailModal({
                       </button>
                     )}
                     
-                    {/* REJECT: Show for pending/assigned when admin */}
+                    {/* REJECT: Show for pending/assigned/in_progress */}
                     {canReject && (
                       <button
                         onClick={() => setShowRejectModal(true)}
@@ -604,6 +711,7 @@ export function TicketDetailModal({
                             onClose={() => setShowAssignDropdown(false)}
                             onSelect={(id, name) => setSelectedManagerId(id)}
                             selectedId={selectedManagerId}
+                            managersList={managersList}
                           />
                         </div>
                         
@@ -676,7 +784,7 @@ export function TicketDetailModal({
                         <MessageCircle className="h-4 w-4 text-stone-500" />
                         <h3 className="text-sm font-semibold text-stone-700">Comments ({ticket.comments.length})</h3>
                       </div>
-                      <div className="space-y-3 flex-1 overflow-y-auto mb-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      <div className="space-y-3 flex-1 overflow-y-auto mb-4 overscroll-contain max-h-[240px]" style={{ WebkitOverflowScrolling: 'touch' }}>
                         {ticket.comments.map((comment) => (
                           <CommentItem key={comment.id} comment={comment} />
                         ))}
@@ -688,12 +796,12 @@ export function TicketDetailModal({
                       {/* Add Comment */}
                       <div className="flex gap-2 pt-3 border-t border-white/40">
                         <input
-                          type="text"
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                          placeholder="Write a comment..."
-                          className="flex-1 rounded-lg border border-white/55 bg-white/40 px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
+                           type="text"
+                           value={newComment}
+                           onChange={(e) => setNewComment(e.target.value)}
+                           onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                           placeholder="Write a comment..."
+                           className="flex-1 rounded-lg border border-white/55 bg-white/40 px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#c3a26c]/30"
                         />
                         <button
                           onClick={handleAddComment}

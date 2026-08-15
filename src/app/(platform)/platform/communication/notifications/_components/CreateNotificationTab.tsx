@@ -9,6 +9,7 @@ import { AudienceSelect } from './AudienceSelect';
 import { NotificationPriority, NotificationDelivery, AudienceFilter, NotificationTemplate } from './types';
 import { notificationTemplates } from './mockData';
 import { notificationService } from '@/services/notificationService';
+import { toast } from 'sonner';
 
 export interface CreateNotificationTabRef {
   setFormFromTemplate: (template: NotificationTemplate) => void;
@@ -47,16 +48,31 @@ export const CreateNotificationTab = forwardRef<CreateNotificationTabRef>((_prop
   };
 
   const handleSend = async () => {
-    if (!title || !message) return;
+    if (!title.trim() || !message.trim()) return;
     setIsSending(true);
     try {
-      await notificationService.send({
-        recipient: audience.value || 'all-residents',
-        subject: title,
-        message: message,
-        channel: delivery === 'email' ? 'EMAIL' : 'FCM',
-      }).catch(() => {});
+      const recipient = audience.value || (audience.type === 'all' ? 'all-residents' : 'all-residents');
 
+      if (delivery === 'both') {
+        await notificationService.sendMulti(
+          {
+            recipient,
+            subject: title,
+            message: message,
+            channel: 'EMAIL',
+          },
+          ['EMAIL', 'PUSH'] as any
+        );
+      } else {
+        await notificationService.send({
+          recipient,
+          subject: title,
+          message: message,
+          channel: (delivery === 'email' ? 'EMAIL' : 'PUSH') as any,
+        });
+      }
+
+      toast.success('Đã phát thông báo thành công!');
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
@@ -68,8 +84,9 @@ export const CreateNotificationTab = forwardRef<CreateNotificationTabRef>((_prop
         setScheduleType('now');
         setSelectedTemplate(null);
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to send notification:', err);
+      toast.error(err?.response?.data?.message || 'Không thể gửi thông báo. Vui lòng kiểm tra lại!');
     } finally {
       setIsSending(false);
     }
